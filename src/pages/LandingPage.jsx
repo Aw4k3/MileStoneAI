@@ -12,6 +12,8 @@ import {
   ShieldCheck,
   Sun,
   Moon,
+  Clock,
+  BookOpen,
 } from 'lucide-react';
 
 const STARTER_BLUEPRINTS = [
