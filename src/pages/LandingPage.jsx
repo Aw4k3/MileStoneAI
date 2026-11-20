@@ -1,7 +1,8 @@
 // src/pages/LandingPage.jsx
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../contexts/AuthContext';
 import {
   Rocket,
   Target,
@@ -38,6 +39,17 @@ const features = [
 ];
 
 export default function LandingPage() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  // If already authenticated or returning with OAuth hash, navigate to dashboard
+  useEffect(() => {
+    if (window.location.hash?.includes('access_token')) {
+      navigate('/dashboard' + window.location.hash, { replace: true });
+    } else if (user && !loading) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, loading, navigate]);
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
       {/* Top Navbar */}
@@ -51,19 +63,31 @@ export default function LandingPage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            to="/auth"
-            className="text-sm font-medium text-slate-300 hover:text-white px-3 py-1.5 transition-colors"
-          >
-            Sign In
-          </Link>
-          <Link
-            to="/wizard"
-            className="btn-primary text-xs sm:text-sm py-2 px-4 inline-flex items-center gap-1.5"
-          >
-            Create Roadmap
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          {user ? (
+            <Link
+              to="/dashboard"
+              className="btn-primary text-xs sm:text-sm py-2 px-4 inline-flex items-center gap-1.5"
+            >
+              Open Dashboard
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/auth"
+                className="text-sm font-medium text-slate-300 hover:text-white px-3 py-1.5 transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/wizard"
+                className="btn-primary text-xs sm:text-sm py-2 px-4 inline-flex items-center gap-1.5"
+              >
+                Create Roadmap
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
