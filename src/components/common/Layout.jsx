@@ -8,13 +8,17 @@ import {
   Settings,
   LogOut,
   Presentation,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export default function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = async () => {
     await logout();
@@ -84,7 +88,22 @@ export default function Layout({ children }) {
           </nav>
 
           {/* Right Profile / Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Quick Theme Toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1a2332] border border-[#242f42] transition-colors focus-visible:ring-2 focus-visible:ring-blue-500"
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4 text-amber-400" aria-hidden="true" />
+              ) : (
+                <Moon className="w-4 h-4 text-blue-500" aria-hidden="true" />
+              )}
+            </button>
+
             {user ? (
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2 pl-2 pr-3 py-1 bg-[#121824] border border-[#242f42] rounded-lg">

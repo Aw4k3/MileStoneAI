@@ -211,7 +211,7 @@ export default function WizardPage() {
 
         setIsGenerating(false);
         navigate(`/roadmap/${fallback.id}`);
-      } catch (fallbackErr) {
+      } catch {
         setIsGenerating(false);
         setErrorMessage('Failed to generate blueprint. Please try again.');
       }

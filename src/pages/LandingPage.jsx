@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   Rocket,
   CheckCircle2,
@@ -9,13 +10,8 @@ import {
   Layers,
   ArrowRight,
   ShieldCheck,
-  BookOpen,
-  Sparkles,
-  Zap,
-  Code2,
-  Check,
-  Clock,
-  Compass,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 const STARTER_BLUEPRINTS = [
@@ -59,6 +55,7 @@ const STARTER_BLUEPRINTS = [
 
 export default function LandingPage() {
   const { user, loading } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
 
@@ -88,7 +85,20 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs sm:text-sm">
+        <div className="flex items-center gap-2.5 sm:gap-3 text-xs sm:text-sm">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1a2332] border border-[#242f42] transition-colors focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-4 h-4 text-amber-400" aria-hidden="true" />
+            ) : (
+              <Moon className="w-4 h-4 text-blue-500" aria-hidden="true" />
+            )}
+          </button>
           <Link
             to="/docs"
             className="font-medium text-slate-300 hover:text-white px-3 py-1.5 transition-colors hidden sm:inline-block"

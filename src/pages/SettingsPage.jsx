@@ -1,5 +1,5 @@
 // src/pages/SettingsPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Settings as SettingsIcon,
@@ -9,60 +9,45 @@ import {
   Trash2,
   AlertTriangle,
   Check,
-  Key,
-  ExternalLink,
-  RefreshCw,
-  Shield,
-  Eye,
-  EyeOff,
+  Palette,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Modal from '../components/common/Modal';
 import Spinner from '../components/common/Spinner';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../hooks/useSettings';
 import { useRoadmaps } from '../hooks/useRoadmaps';
 import { useStats } from '../hooks/useStats';
-import { getGeminiApiKey, setGeminiApiKey } from '../lib/gemini';
 import {
   MENTOR_PERSONAS,
   PACING_OPTIONS,
 } from '../lib/constants';
 
 export default function SettingsPage() {
-  const { user, logout, wipeAllLocalData } = useAuth();
+  const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const { settings, loading, updateSettings, deleteAllUserData } = useSettings();
   const { roadmaps } = useRoadmaps();
   const { stats } = useStats();
 
   const [savedNotice, setSavedNotice] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [apiKeySaved, setApiKeySaved] = useState(false);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
   const [isWiping, setIsWiping] = useState(false);
   const [dataWiped, setDataWiped] = useState(false);
 
-  useEffect(() => {
-    const existingKey = getGeminiApiKey();
-    if (existingKey) {
-      setApiKeyInput(existingKey);
-    }
-  }, []);
-
   const triggerSaveNotification = () => {
     setSavedNotice(true);
     setTimeout(() => setSavedNotice(false), 2000);
   };
 
-  const handleSaveApiKey = (e) => {
-    e.preventDefault();
-    setGeminiApiKey(apiKeyInput);
-    setApiKeySaved(true);
+  const handleThemeChange = (newTheme) => {
+    setTheme(newTheme);
     triggerSaveNotification();
-    setTimeout(() => setApiKeySaved(false), 3000);
   };
 
   const handlePersonaChange = async (persona) => {
@@ -139,7 +124,7 @@ export default function SettingsPage() {
               Settings &amp; Preferences
             </h1>
             <p className="text-xs text-slate-300 mt-1">
-              Configure your mentor personality, optional API credentials, and manage application data.
+              Configure your visual theme, mentor personality, notifications, and manage application data.
             </p>
           </div>
 
@@ -164,61 +149,85 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* 1. Google Gemini AI Engine & API Key */}
+        {/* 1. Interface Theme Customization */}
         <div className="p-5 sm:p-6 rounded-2xl bg-[#121824] border border-[#242f42] space-y-3.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Key className="w-4 h-4 text-blue-400" aria-hidden="true" />
-              <div>
-                <h2 className="text-sm font-bold text-white">Google Gemini Cloud Engine</h2>
-                <p className="text-xs text-slate-400">
-                  Milestone AI runs live on Google Gemini 2.5 &amp; 2.0 Flash via Supabase Edge. You may optionally supply a personal AI Studio key.
-                </p>
-              </div>
+          <div className="flex items-center gap-2.5">
+            <Palette className="w-4 h-4 text-blue-400" aria-hidden="true" />
+            <div>
+              <h2 className="text-sm font-bold text-white">Interface Theme</h2>
+              <p className="text-xs text-slate-400">
+                Customize your appearance preference. The selected theme persists across all pages and sessions.
+              </p>
             </div>
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-blue-400 hover:text-white flex items-center gap-1 font-medium shrink-0"
-            >
-              Get Free Key <ExternalLink className="w-3 h-3" aria-hidden="true" />
-            </a>
           </div>
 
-          <form onSubmit={handleSaveApiKey} className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                id="gemini-api-key"
-                name="apiKey"
-                type={showApiKey ? 'text' : 'password'}
-                autoComplete="off"
-                spellCheck={false}
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                placeholder="AIzaSy… (Optional override)"
-                className="input-field text-xs font-mono bg-[#0b0f17] pr-10"
-                aria-label="Google Gemini API Key"
-              />
-              <button
-                type="button"
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-                aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
-              >
-                {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Interface Theme">
             <button
-              type="submit"
-              className="btn-primary text-xs py-2 px-4 shrink-0 font-semibold"
+              type="button"
+              role="radio"
+              aria-checked={theme === 'dark'}
+              onClick={() => handleThemeChange('dark')}
+              className={`p-4 rounded-xl border text-left transition-colors flex items-start justify-between gap-3 ${
+                theme === 'dark'
+                  ? 'bg-blue-600/15 border-blue-500 text-white ring-1 ring-blue-500/40 shadow-xs'
+                  : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200 hover:border-[#3b4c68]'
+              }`}
             >
-              {apiKeySaved ? 'Saved!' : 'Save Key'}
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-[#161f2e] border border-[#242f42] text-blue-400">
+                  <Moon className="w-4 h-4" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="font-semibold text-xs text-white">Dark Mode</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                    Deep slate palette with low glare, designed for focus and extended study sessions.
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
+                  theme === 'dark'
+                    ? 'bg-blue-600 border-blue-500 text-white'
+                    : 'border-slate-600 bg-[#121824]'
+                }`}
+              >
+                {theme === 'dark' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+              </div>
             </button>
-          </form>
-          <p className="text-[11px] font-mono text-slate-500">
-            Stored locally in your client environment. Zero server storage of personal API keys.
-          </p>
+
+            <button
+              type="button"
+              role="radio"
+              aria-checked={theme === 'light'}
+              onClick={() => handleThemeChange('light')}
+              className={`p-4 rounded-xl border text-left transition-colors flex items-start justify-between gap-3 ${
+                theme === 'light'
+                  ? 'bg-blue-600/15 border-blue-500 text-white ring-1 ring-blue-500/40 shadow-xs'
+                  : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200 hover:border-[#3b4c68]'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-[#161f2e] border border-[#242f42] text-amber-400">
+                  <Sun className="w-4 h-4" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="font-semibold text-xs text-white">Light Mode</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                    Clean, crisp high-contrast surfaces designed for readability in bright environments.
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
+                  theme === 'light'
+                    ? 'bg-blue-600 border-blue-500 text-white'
+                    : 'border-slate-600 bg-[#121824]'
+                }`}
+              >
+                {theme === 'light' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* 2. Mentor Persona */}

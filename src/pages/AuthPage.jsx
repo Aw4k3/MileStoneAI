@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Rocket, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Rocket, RefreshCw, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import Spinner from '../components/common/Spinner';
 
 export default function AuthPage() {
+  const { theme, toggleTheme } = useTheme();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -57,7 +59,24 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-[#0b0f17] text-slate-100">
+    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-[#0b0f17] text-slate-100 relative">
+      {/* Quick Theme Toggle */}
+      <div className="absolute top-4 right-4">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="p-2 rounded-xl text-slate-400 hover:text-white bg-[#121824] border border-[#242f42] transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 shadow-sm"
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? (
+            <Sun className="w-4 h-4 text-amber-400" aria-hidden="true" />
+          ) : (
+            <Moon className="w-4 h-4 text-blue-500" aria-hidden="true" />
+          )}
+        </button>
+      </div>
+
       {/* Brand Header */}
       <Link
         to="/"

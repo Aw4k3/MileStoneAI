@@ -224,3 +224,242 @@
     font-family: var(--font-mono);
   }
 }
+
+/* ── Light Mode Design System Overrides ─────────────────────────── */
+html.light {
+  color-scheme: light;
+}
+
+html.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Background overrides */
+html.light .bg-\[\#0b0f17\],
+html.light .bg-slate-950 {
+  background-color: #f8fafc !important;
+}
+
+html.light header.bg-\[\#0b0f17\]\/95,
+html.light .bg-\[\#0b0f17\]\/95 {
+  background-color: rgba(248, 250, 252, 0.95) !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+html.light .bg-\[\#121824\] {
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+}
+
+html.light .bg-\[\#0e141f\],
+html.light .bg-\[\#0d131d\],
+html.light .bg-\[\#0d121c\] {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-\[\#161f2e\],
+html.light .bg-\[\#1a2332\],
+html.light .bg-\[\#131b26\] {
+  background-color: #f1f5f9 !important;
+}
+
+/* Border overrides */
+html.light .border-\[\#242f42\],
+html.light .border-\[\#1e293b\],
+html.light .border-\[\#2e3d54\],
+html.light .border-\[\#192231\],
+html.light .border-\[\#1e293b\]\/80 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .hover\:border-\[\#3b4c68\]:hover,
+html.light .hover\:border-slate-500:hover,
+html.light .hover\:border-slate-600:hover {
+  border-color: #cbd5e1 !important;
+}
+
+html.light .hover\:bg-\[\#121824\]:hover,
+html.light .hover\:bg-\[\#141c2b\]:hover,
+html.light .hover\:bg-\[\#161f2e\]:hover,
+html.light .hover\:bg-\[\#1a2332\]:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* Typography & Headings in Light Mode */
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light h5,
+html.light h6 {
+  color: #0f172a !important;
+}
+
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.light .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+
+html.light .hover\:text-slate-200:hover {
+  color: #0f172a !important;
+}
+
+html.light .hover\:text-slate-300:hover {
+  color: #1e293b !important;
+}
+
+/* Elements that MUST keep white text */
+html.light .btn-primary,
+html.light .btn-primary *,
+html.light .bg-blue-600,
+html.light .bg-blue-600 *,
+html.light .bg-rose-600,
+html.light .bg-rose-600 * {
+  color: #ffffff !important;
+}
+
+/* Card utilities in Light Mode */
+html.light .card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .card-hover:hover {
+  border-color: #cbd5e1 !important;
+  background-color: #f8fafc !important;
+}
+
+html.light .card-elevated {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Secondary Button in Light Mode */
+html.light .btn-secondary {
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .btn-secondary:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
+/* Input Fields in Light Mode */
+html.light .input-field {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light .input-field:focus-visible {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25) !important;
+}
+
+html.light .input-field::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Color Accents & High-Contrast Text */
+html.light .text-blue-400 {
+  color: #2563eb !important;
+}
+html.light .text-blue-300 {
+  color: #1d4ed8 !important;
+}
+html.light .text-emerald-400 {
+  color: #059669 !important;
+}
+html.light .text-emerald-300 {
+  color: #047857 !important;
+}
+html.light .text-amber-400 {
+  color: #d97706 !important;
+}
+html.light .text-rose-400 {
+  color: #e11d48 !important;
+}
+html.light .text-rose-300 {
+  color: #be123c !important;
+}
+
+/* Accent Containers in Light Mode */
+html.light .bg-blue-500\/10,
+html.light .bg-blue-600\/10,
+html.light .bg-blue-600\/15 {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+html.light .bg-blue-950\/20,
+html.light .bg-blue-950\/40 {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+html.light .bg-rose-500\/10,
+html.light .bg-rose-950\/10 {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+}
+
+html.light .bg-emerald-500\/10,
+html.light .bg-emerald-500\/20 {
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+}
+
+html.light .bg-amber-500\/10 {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+
+/* Modal Backdrops & Dialogs in Light Mode */
+html.light .fixed.inset-0.bg-slate-950\/80 {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+}
+
+/* Scrollbars in Light Mode */
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Code & Pre Blocks in Light Mode */
+html.light pre,
+html.light code {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
