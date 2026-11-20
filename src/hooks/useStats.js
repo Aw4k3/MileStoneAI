@@ -32,13 +32,15 @@ function saveStoredStats(userId, statsData) {
 }
 
 export function useStats() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState(() => {
     return user ? (getStoredStats(user.id) || DEFAULT_ZERO_STATS) : DEFAULT_ZERO_STATS;
   });
   const [loading, setLoading] = useState(true);
 
   const fetchStats = useCallback(async () => {
+    if (authLoading) return;
+
     if (!user) {
       setStats(DEFAULT_ZERO_STATS);
       setLoading(false);
@@ -92,11 +94,13 @@ export function useStats() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    if (!authLoading) {
+      fetchStats();
+    }
+  }, [authLoading, fetchStats]);
 
   // Award XP to user
   const awardXp = async (amount) => {

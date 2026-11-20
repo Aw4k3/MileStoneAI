@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { MOCK_ROADMAPS, MOCK_MILESTONES } from '../lib/mockData';
 
 function getRoadmapsStorageKey(userId) {
   return userId ? `milestone_ai_${userId}_roadmaps` : 'milestone_ai_guest_roadmaps';
@@ -53,7 +52,7 @@ function sanitizeResourceType(type) {
 }
 
 export function useRoadmaps() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [roadmaps, setRoadmaps] = useState([]);
   const [milestonesMap, setMilestonesMap] = useState({});
   const [loading, setLoading] = useState(true);
@@ -61,6 +60,8 @@ export function useRoadmaps() {
 
   // Fetch all roadmaps scoped strictly to the current user
   const fetchRoadmaps = useCallback(async () => {
+    if (authLoading) return;
+
     setLoading(true);
     setError(null);
 
@@ -113,21 +114,17 @@ export function useRoadmaps() {
       }
     }
 
-    // 3. For guest users without any created roadmaps, show curated starter blueprints
-    if (!user && combinedRoadmaps.length === 0) {
-      combinedRoadmaps = [...MOCK_ROADMAPS];
-      combinedMilestonesMap = { ...MOCK_MILESTONES, ...combinedMilestonesMap };
-    }
-
-    // Authenticated users with 0 roadmaps get clean empty state ([]), NOT mock roadmaps
+    // Always maintain clean state: no dummy mock blueprints injected
     setRoadmaps(combinedRoadmaps);
     setMilestonesMap(combinedMilestonesMap);
     setLoading(false);
-  }, [user]);
+  }, [user, authLoading]);
 
   useEffect(() => {
-    fetchRoadmaps();
-  }, [fetchRoadmaps]);
+    if (!authLoading) {
+      fetchRoadmaps();
+    }
+  }, [authLoading, fetchRoadmaps]);
 
   // Create a new roadmap
   const createRoadmap = async ({

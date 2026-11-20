@@ -24,7 +24,7 @@ import { useRoadmaps } from '../hooks/useRoadmaps';
 import { useStats } from '../hooks/useStats';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { roadmaps, milestonesMap, loading: roadmapsLoading } = useRoadmaps();
   const { stats, loading: statsLoading } = useStats();
 
@@ -35,17 +35,17 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    // If the user has roadmaps or XP, they are definitely returning
+    if (authLoading) return;
+
     if (roadmaps.length > 0 || (stats && stats.total_xp > 0)) {
       setIsFirstVisit(false);
       localStorage.setItem(visitedKey, 'true');
     } else if (localStorage.getItem(visitedKey)) {
       setIsFirstVisit(false);
     } else {
-      // First visit recorded once rendered
       localStorage.setItem(visitedKey, 'true');
     }
-  }, [user, roadmaps.length, stats, visitedKey]);
+  }, [user, roadmaps.length, stats, visitedKey, authLoading]);
 
   // Calculate global completion rate across all roadmaps
   let totalMilestonesCount = 0;
@@ -66,7 +66,8 @@ export default function DashboardPage() {
   const activeMilestones = activeBlueprint ? milestonesMap[activeBlueprint.id] || [] : [];
   const nextMilestone = activeMilestones.find((m) => !m.is_completed) || activeMilestones[0];
 
-  if (roadmapsLoading || statsLoading) {
+  // Prevent flash of empty or unauthenticated state while auth or data is initializing
+  if (authLoading || roadmapsLoading || statsLoading) {
     return (
       <Layout>
         <div className="py-24 flex flex-col items-center justify-center space-y-4">

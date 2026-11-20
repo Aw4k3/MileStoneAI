@@ -13,6 +13,7 @@ import {
   Zap,
   Key,
   ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Modal from '../components/common/Modal';
@@ -29,7 +30,7 @@ import {
 } from '../lib/constants';
 
 export default function SettingsPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, wipeAllLocalData } = useAuth();
   const { settings, loading, updateSettings, deleteAllUserData } = useSettings();
   const { roadmaps } = useRoadmaps();
   const { stats } = useStats();
@@ -374,6 +375,15 @@ export default function SettingsPage() {
             >
               <Download className="w-4 h-4 text-slate-400" />
               Export All Data (JSON)
+            </button>
+            <button
+              type="button"
+              onClick={wipeAllLocalData}
+              className="btn-secondary w-full sm:w-auto text-xs py-2.5 px-4 flex items-center justify-center gap-2 hover:border-slate-600"
+              title="Clears all local auth tokens and cached blueprints"
+            >
+              <RefreshCw className="w-4 h-4 text-slate-400" />
+              Reset Local Session Cache
             </button>
             <button
               type="button"

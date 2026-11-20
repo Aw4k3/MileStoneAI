@@ -1,9 +1,29 @@
 // src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { MOCK_USER } from '../lib/mockData';
 
 const AuthContext = createContext(null);
+
+function clearUserStorage(userId) {
+  try {
+    if (userId) {
+      localStorage.removeItem(`milestone_ai_${userId}_roadmaps`);
+      localStorage.removeItem(`milestone_ai_${userId}_milestones`);
+      localStorage.removeItem(`milestone_ai_${userId}_stats`);
+      localStorage.removeItem(`milestone_visited_${userId}`);
+    }
+    // Also remove global and guest cache
+    localStorage.removeItem('milestone_ai_user_roadmaps');
+    localStorage.removeItem('milestone_ai_user_milestones');
+    localStorage.removeItem('milestone_ai_user_stats');
+    localStorage.removeItem('milestone_ai_guest_roadmaps');
+    localStorage.removeItem('milestone_ai_guest_milestones');
+    localStorage.removeItem('milestone_ai_guest_stats');
+    localStorage.removeItem('milestone_visited_guest');
+  } catch (err) {
+    console.warn('Storage cleanup notice:', err);
+  }
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -33,7 +53,7 @@ export function AuthProvider({ children }) {
         { onConflict: 'id' }
       );
 
-      // If email column doesn't exist yet in database, fallback to without email
+      // If email column does not exist yet in database, fallback to without email
       if (error && error.message?.includes('email')) {
         await supabase.from('profiles').upsert(
           {
@@ -55,15 +75,34 @@ export function AuthProvider({ children }) {
 
     async function initAuth() {
       try {
-        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.warn('Supabase getSession notice:', error.message);
+        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.warn('Supabase getSession notice:', sessionError.message);
         }
 
-        if (mounted) {
-          setSession(initialSession);
-          if (initialSession?.user) {
-            const authUser = initialSession.user;
+        if (initialSession?.user) {
+          // Verify with Supabase server whether user ACTUALLY still exists in database
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+
+          if (userError || !userData?.user) {
+            console.warn('User does not exist on Supabase server (possibly deleted). Purging stale local session.');
+            try {
+              await supabase.auth.signOut();
+            } catch {
+              // ignore
+            }
+            clearUserStorage(initialSession.user.id);
+            if (mounted) {
+              setSession(null);
+              setUser(null);
+              setLoading(false);
+            }
+            return;
+          }
+
+          if (mounted) {
+            setSession(initialSession);
+            const authUser = userData.user;
             let displayName =
               authUser.user_metadata?.full_name ||
               authUser.user_metadata?.name ||
@@ -93,13 +132,19 @@ export function AuthProvider({ children }) {
               display_name: displayName,
               avatar_url: avatarUrl,
             });
-          } else {
+          }
+        } else {
+          if (mounted) {
+            setSession(null);
             setUser(null);
           }
         }
       } catch (err) {
         console.warn('Auth initialization notice:', err.message);
-        if (mounted) setUser(null);
+        if (mounted) {
+          setUser(null);
+          setSession(null);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -110,6 +155,14 @@ export function AuthProvider({ children }) {
     // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       setSession(newSession);
+
+      if (event === 'SIGNED_OUT' || !newSession?.user) {
+        setUser(null);
+        setSession(null);
+        setLoading(false);
+        return;
+      }
+
       if (newSession?.user) {
         const authUser = newSession.user;
         let displayName =
@@ -140,8 +193,7 @@ export function AuthProvider({ children }) {
           display_name: displayName,
           avatar_url: avatarUrl,
         });
-      } else {
-        setUser(null);
+        setLoading(false);
       }
     });
 
@@ -231,8 +283,9 @@ export function AuthProvider({ children }) {
 
       if (error) throw error;
       return data;
-    } finally {
+    } catch (err) {
       setLoading(false);
+      throw err;
     }
   }, []);
 
@@ -240,12 +293,27 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     setLoading(true);
     try {
+      const currentUserId = user?.id;
       await supabase.auth.signOut();
+      clearUserStorage(currentUserId);
       setUser(null);
       setSession(null);
     } finally {
       setLoading(false);
     }
+  }, [user]);
+
+  // Full local storage wipe & logout
+  const wipeAllLocalData = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // non-fatal
+    }
+    localStorage.clear();
+    setUser(null);
+    setSession(null);
+    window.location.href = '/auth';
   }, []);
 
   const value = {
@@ -258,6 +326,7 @@ export function AuthProvider({ children }) {
     signup,
     loginWithGoogle,
     logout,
+    wipeAllLocalData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
