@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   Zap,
-  Cpu,
   BookOpen,
   Layers,
   Wand2,
@@ -30,7 +29,6 @@ import {
 import {
   ROADMAP_TEMPLATES,
   PACING_OPTIONS,
-  GEMINI_MODELS,
   DIFFICULTY_LEVELS,
 } from '../lib/constants';
 
@@ -49,7 +47,6 @@ export default function WizardPage() {
   const [durationMonths, setDurationMonths] = useState(3);
   const [pacing, setPacing] = useState('weekly');
   const [targetMilestones, setTargetMilestones] = useState(8);
-  const [geminiModel, setGeminiModel] = useState('pro');
 
   // AI Formal Title Suggestions State
   const [suggestedTitles, setSuggestedTitles] = useState([]);
@@ -136,7 +133,7 @@ export default function WizardPage() {
   const handleGenerate = async () => {
     setIsGenerating(true);
     setErrorMessage('');
-    setGenerationStepText(`Synthesizing blueprint with Gemini ${geminiModel.toUpperCase()}...`);
+    setGenerationStepText('Synthesizing structured curriculum blueprint with Gemini AI...');
 
     let generatedRoadmapId = null;
 
@@ -148,8 +145,6 @@ export default function WizardPage() {
         duration_months: durationMonths,
         pacing,
         target_milestones: targetMilestones,
-        gemini_model: geminiModel,
-        model: geminiModel,
       });
 
       setGenerationStepText(`Generated ${aiData?.milestones?.length || targetMilestones} comprehensive milestones with verified resources...`);
@@ -168,7 +163,6 @@ export default function WizardPage() {
           'Build, verify, and test decoupled production deliverables',
           'Deploy verified milestone capstones with automated testing',
         ],
-        gemini_model: geminiModel,
         milestones: aiData?.milestones || [],
       });
 
@@ -190,7 +184,6 @@ export default function WizardPage() {
           duration_months: durationMonths,
           pacing,
           key_outcomes: ['Master core competencies and project deliverables'],
-          gemini_model: geminiModel,
           milestones: [
             {
               title: 'Phase 1: Foundations & Tooling',
@@ -574,45 +567,6 @@ export default function WizardPage() {
                           }`}
                         >
                           {level}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Gemini Engine Switcher */}
-                <div className="space-y-2.5 pt-2">
-                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-                    Gemini AI Model Engine
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {GEMINI_MODELS.map((m) => {
-                      const isSelected = geminiModel === m.value;
-                      return (
-                        <button
-                          key={m.value}
-                          type="button"
-                          onClick={() => setGeminiModel(m.value)}
-                          className={`p-3.5 rounded-xl border text-left text-xs transition-all flex items-center gap-3 ${
-                            isSelected
-                              ? 'bg-indigo-500/10 border-indigo-500 text-slate-100'
-                              : 'bg-slate-800/30 border-slate-800 text-slate-400 hover:text-slate-200'
-                          }`}
-                        >
-                          <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                              m.value === 'flash'
-                                ? 'bg-amber-500/10 text-amber-400'
-                                : 'bg-indigo-500/10 text-indigo-400'
-                            }`}
-                          >
-                            <Zap className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-slate-200">{m.label}</p>
-                            <p className="text-[11px] text-slate-400">{m.description}</p>
-                          </div>
                         </button>
                       );
                     })}

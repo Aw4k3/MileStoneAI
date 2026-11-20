@@ -1252,6 +1252,53 @@ export async function suggestTitlesWithAI(payload) {
 export const suggestCourseTitlesWithAI = suggestTitlesWithAI;
 
 export async function generateRoadmapWithAI(payload) {
+  // 1. Try dedicated generate-roadmap edge function (Internal Model: gemini-2.5-flash)
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-roadmap', {
+        body: {
+          goal: payload.goal,
+          targetMonths: payload.duration_months || payload.targetMonths || 3,
+          skillLevel: payload.difficulty || payload.skillLevel || 'Intermediate',
+        },
+      });
+
+      if (!error && data && data.milestones && data.milestones.length > 0) {
+        return {
+          title: data.title || payload.goal,
+          goal_summary: data.description || payload.goal,
+          key_outcomes: data.target_outcomes || [],
+          milestones: data.milestones.map((m, idx) => ({
+            id: m.id || `ms-${idx + 1}`,
+            title: m.title,
+            description: m.description,
+            month_range: m.month_range || `Month ${idx + 1}`,
+            is_major: idx === data.milestones.length - 1,
+            xp_reward: 200,
+            deliverables:
+              m.deliverables && m.deliverables.length > 0
+                ? m.deliverables
+                : (m.tasks || []).map((t) => (typeof t === 'string' ? t : t.title)),
+            tasks: m.tasks || [],
+            resources: (m.resources || []).map((r) => ({
+              title: r.title,
+              type: r.type || 'docs',
+              search_query: r.search_query,
+              url:
+                r.url ||
+                (r.search_query
+                  ? `https://www.youtube.com/results?search_query=${encodeURIComponent(r.search_query)}`
+                  : 'https://developer.mozilla.org/'),
+            })),
+          })),
+        };
+      }
+    } catch (edgeErr) {
+      console.warn('generate-roadmap endpoint notice, falling back:', edgeErr.message);
+    }
+  }
+
+  // 2. Fall back to gemini-proxy / local engine
   return invokeGemini('generate_roadmap', payload);
 }
 
@@ -1266,6 +1313,27 @@ export async function generateMicroQuiz(payload) {
 export const generateMicroQuizWithAI = generateMicroQuiz;
 
 export async function estimateDurationWithAI(payload) {
+  // 1. Try dedicated estimate-duration edge function (Internal Model: gemini-2.5-flash)
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase.functions.invoke('estimate-duration', {
+        body: { goal: payload.goal },
+      });
+
+      if (!error && data && data.recommended_months) {
+        return {
+          recommended_months: data.recommended_months,
+          recommended_pacing: 'weekly',
+          recommended_milestones: data.recommended_months * 2,
+          reasoning: data.reasoning || '',
+        };
+      }
+    } catch (edgeErr) {
+      console.warn('estimate-duration endpoint notice, falling back:', edgeErr.message);
+    }
+  }
+
+  // 2. Fall back to gemini-proxy / local engine
   return invokeGemini('estimate_duration', payload);
 }
 

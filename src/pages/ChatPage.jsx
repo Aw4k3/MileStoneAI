@@ -9,7 +9,6 @@ import {
   Bot,
   User,
   Sparkles,
-  Zap,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Spinner from '../components/common/Spinner';
@@ -41,7 +40,6 @@ export default function ChatPage() {
 
   const [inputText, setInputText] = useState('');
   const [persona, setPersona] = useState('tutor');
-  const [geminiModel, setGeminiModel] = useState('flash');
 
   const messagesEndRef = useRef(null);
 
@@ -56,7 +54,7 @@ export default function ChatPage() {
   const handleSend = (text) => {
     const query = text || inputText;
     if (!query.trim() || isTyping) return;
-    sendMessage(query, persona, geminiModel);
+    sendMessage(query, persona);
     setInputText('');
   };
 
@@ -106,17 +104,6 @@ export default function ChatPage() {
               <Sparkles className="w-3 h-3 text-emerald-400" />
               <span className="text-[10px] hidden sm:inline">AI Active</span>
             </div>
-
-            {/* Model Switcher inline chip */}
-            <button
-              type="button"
-              onClick={() => setGeminiModel((m) => (m === 'flash' ? 'pro' : 'flash'))}
-              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 flex items-center gap-1.5 transition-colors"
-              title="Toggle Gemini Flash / Pro engine"
-            >
-              <Zap className={`w-3 h-3 ${geminiModel === 'flash' ? 'text-amber-400' : 'text-indigo-400'}`} />
-              <span className="uppercase text-[10px]">Gemini {geminiModel}</span>
-            </button>
 
             {/* Persona Switcher */}
             <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">

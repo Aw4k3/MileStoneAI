@@ -43,8 +43,8 @@ export function useChat(roadmapId, roadmapTitle, goalSummary, activeMilestoneTit
     fetchMessages();
   }, [fetchMessages]);
 
-  // Send a message with live Gemini AI Proxy
-  const sendMessage = async (text, persona = 'tutor', geminiModel = 'flash') => {
+  // Send a message with low-latency streaming AI Mentor
+  const sendMessage = async (text, persona = 'tutor') => {
     if (!text.trim() || isTyping) return;
 
     const userMsg = {
@@ -76,50 +76,147 @@ export function useChat(roadmapId, roadmapTitle, goalSummary, activeMilestoneTit
       }
     }
 
-    try {
-      // Invoke secure Gemini Proxy Edge Function
-      const aiResponse = await sendMentorMessage({
-        messages: updatedMessages.slice(-6), // Send last 6 conversation turns for context
-        roadmap_title: roadmapTitle,
-        goal_summary: goalSummary,
-        active_milestone: activeMilestoneTitle,
-        persona,
-        model: geminiModel,
-        gemini_model: geminiModel,
-      });
+    const botMsgId = `bot-${Date.now()}`;
+    let accumulatedContent = '';
+    let streamSuccess = false;
 
-      const botContent = aiResponse?.content || 'I am ready to help you with your deliverables.';
+    // 1. Stream from dedicated Supabase chat-mentor Edge Function
+    if (isSupabaseConfigured) {
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://pgoeqctzvbzwhafcrcvq.supabase.co';
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-      const botMsg = {
-        id: `bot-${Date.now()}`,
-        roadmap_id: roadmapId,
-        user_id: user?.id || 'bot_01',
-        role: 'assistant',
-        content: botContent,
-        persona,
-        created_at: new Date().toISOString(),
-      };
+        const response = await fetch(`${supabaseUrl}/functions/v1/chat-mentor`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(anonKey ? { Authorization: `Bearer ${anonKey}`, apikey: anonKey } : {}),
+          },
+          body: JSON.stringify({
+            roadmapContext: {
+              title: roadmapTitle || 'Curriculum Blueprint',
+              overallProgressPercent: 0,
+              activeMilestone: activeMilestoneTitle || 'Active Milestone',
+              completedTaskTitles: [],
+              pendingTaskTitles: [],
+            },
+            chatHistory: updatedMessages.slice(-6).map((m) => ({
+              role: m.role === 'assistant' ? 'model' : 'user',
+              text: m.content,
+            })),
+            message: text,
+          }),
+        });
 
-      setMessages((prev) => [...prev, botMsg]);
+        if (response.ok && response.body) {
+          streamSuccess = true;
 
-      if (isSupabaseConfigured && user) {
-        try {
-          await supabase.from('chat_messages').insert({
-            roadmap_id: roadmapId,
-            user_id: user.id,
-            role: 'assistant',
-            content: botContent,
-            persona,
-          });
-        } catch (err) {
-          console.error('Failed to persist assistant message:', err);
+          // Append empty assistant message placeholder for streaming
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: botMsgId,
+              roadmap_id: roadmapId,
+              user_id: user?.id || 'bot_01',
+              role: 'assistant',
+              content: '',
+              persona,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('data:')) {
+                const dataStr = trimmed.slice(5).trim();
+                if (dataStr === '[DONE]') continue;
+
+                try {
+                  const parsed = JSON.parse(dataStr);
+                  if (parsed.chunk) {
+                    accumulatedContent += parsed.chunk;
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === botMsgId ? { ...m, content: accumulatedContent } : m
+                      )
+                    );
+                  }
+                } catch {
+                  // Ignore JSON parse errors for incomplete chunks
+                }
+              }
+            }
+          }
         }
+      } catch (streamErr) {
+        console.warn('Streaming chat-mentor notice, falling back:', streamErr.message);
       }
-    } catch (err) {
-      console.error('Mentor chat error:', err);
-    } finally {
-      setIsTyping(false);
     }
+
+    // 2. Fallback to sendMentorMessage if streaming did not return content
+    if (!streamSuccess || !accumulatedContent.trim()) {
+      try {
+        const aiResponse = await sendMentorMessage({
+          messages: updatedMessages.slice(-6),
+          roadmap_title: roadmapTitle,
+          goal_summary: goalSummary,
+          active_milestone: activeMilestoneTitle,
+          persona,
+        });
+
+        accumulatedContent = aiResponse?.content || 'I am ready to help you with your deliverables.';
+
+        setMessages((prev) => {
+          const exists = prev.some((m) => m.id === botMsgId);
+          if (exists) {
+            return prev.map((m) => (m.id === botMsgId ? { ...m, content: accumulatedContent } : m));
+          }
+          return [
+            ...prev,
+            {
+              id: botMsgId,
+              roadmap_id: roadmapId,
+              user_id: user?.id || 'bot_01',
+              role: 'assistant',
+              content: accumulatedContent,
+              persona,
+              created_at: new Date().toISOString(),
+            },
+          ];
+        });
+      } catch (err) {
+        console.error('Mentor chat fallback error:', err);
+      }
+    }
+
+    // Persist final assistant message to Supabase
+    if (isSupabaseConfigured && user && accumulatedContent) {
+      try {
+        await supabase.from('chat_messages').insert({
+          roadmap_id: roadmapId,
+          user_id: user.id,
+          role: 'assistant',
+          content: accumulatedContent,
+          persona,
+        });
+      } catch (err) {
+        console.error('Failed to persist assistant message:', err);
+      }
+    }
+
+    setIsTyping(false);
   };
 
   return {
