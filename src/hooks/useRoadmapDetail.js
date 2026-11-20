@@ -1,43 +1,68 @@
 // src/hooks/useRoadmapDetail.js
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { MOCK_ROADMAPS, MOCK_MILESTONES } from '../lib/mockData';
 
-const STORAGE_ROADMAPS_KEY = 'milestone_ai_user_roadmaps';
-const STORAGE_MILESTONES_KEY = 'milestone_ai_user_milestones';
+function getRoadmapsStorageKey(userId) {
+  return userId ? `milestone_ai_${userId}_roadmaps` : 'milestone_ai_guest_roadmaps';
+}
 
-function getStoredRoadmap(id) {
+function getMilestonesStorageKey(userId) {
+  return userId ? `milestone_ai_${userId}_milestones` : 'milestone_ai_guest_milestones';
+}
+
+function getStoredRoadmap(userId, id) {
   try {
-    const raw = localStorage.getItem(STORAGE_ROADMAPS_KEY);
+    const raw = localStorage.getItem(getRoadmapsStorageKey(userId));
     const list = raw ? JSON.parse(raw) : [];
-    return list.find((r) => r.id === id) || null;
+    const found = list.find((r) => r.id === id);
+    if (found) return found;
+
+    // Fallback check in guest storage
+    if (userId) {
+      const guestRaw = localStorage.getItem('milestone_ai_guest_roadmaps');
+      const guestList = guestRaw ? JSON.parse(guestRaw) : [];
+      return guestList.find((r) => r.id === id) || null;
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-function getStoredMilestones(id) {
+function getStoredMilestones(userId, id) {
   try {
-    const raw = localStorage.getItem(STORAGE_MILESTONES_KEY);
+    const raw = localStorage.getItem(getMilestonesStorageKey(userId));
     const map = raw ? JSON.parse(raw) : {};
-    return map[id] || null;
+    if (map[id]) return map[id];
+
+    // Fallback check in guest storage
+    if (userId) {
+      const guestRaw = localStorage.getItem('milestone_ai_guest_milestones');
+      const guestMap = guestRaw ? JSON.parse(guestRaw) : {};
+      return guestMap[id] || null;
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-function updateStoredMilestones(roadmapId, milestonesList) {
+function updateStoredMilestones(userId, roadmapId, milestonesList) {
   try {
-    const raw = localStorage.getItem(STORAGE_MILESTONES_KEY);
+    const key = getMilestonesStorageKey(userId);
+    const raw = localStorage.getItem(key);
     const map = raw ? JSON.parse(raw) : {};
     map[roadmapId] = milestonesList;
-    localStorage.setItem(STORAGE_MILESTONES_KEY, JSON.stringify(map));
+    localStorage.setItem(key, JSON.stringify(map));
   } catch (err) {
     console.warn('LocalStorage milestone update error:', err);
   }
 }
 
 export function useRoadmapDetail(roadmapId) {
+  const { user } = useAuth();
   const [roadmap, setRoadmap] = useState(null);
   const [milestones, setMilestones] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,9 +73,11 @@ export function useRoadmapDetail(roadmapId) {
     setLoading(true);
     setError(null);
 
+    const userId = user?.id || null;
+
     // 1. Check local storage first
-    const localRm = getStoredRoadmap(roadmapId);
-    const localMs = getStoredMilestones(roadmapId);
+    const localRm = getStoredRoadmap(userId, roadmapId);
+    const localMs = getStoredMilestones(userId, roadmapId);
 
     if (localRm) {
       setRoadmap(localRm);
@@ -102,7 +129,7 @@ export function useRoadmapDetail(roadmapId) {
     setRoadmap(fallbackRm);
     setMilestones(MOCK_MILESTONES[fallbackRm.id] || []);
     setLoading(false);
-  }, [roadmapId]);
+  }, [roadmapId, user]);
 
   useEffect(() => {
     fetchDetail();
@@ -111,6 +138,7 @@ export function useRoadmapDetail(roadmapId) {
   // Toggle Deliverable status
   const toggleDeliverable = async (milestoneId, deliverableId, currentStatus) => {
     const nextStatus = !currentStatus;
+    const userId = user?.id || null;
 
     setMilestones((prev) => {
       const updated = prev.map((m) => {
@@ -122,52 +150,98 @@ export function useRoadmapDetail(roadmapId) {
           ),
         };
       });
-
-      updateStoredMilestones(roadmapId, updated);
+      updateStoredMilestones(userId, roadmapId, updated);
       return updated;
     });
 
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deliverableId);
-    if (isSupabaseConfigured && isUuid) {
+    if (isSupabaseConfigured && user) {
       try {
         await supabase
           .from('deliverables')
           .update({ is_completed: nextStatus })
           .eq('id', deliverableId);
       } catch (err) {
-        console.warn('Failed to update deliverable in cloud:', err);
+        console.error('Failed to toggle deliverable in Supabase:', err);
       }
     }
   };
 
-  // Toggle Milestone completion
+  // Toggle Milestone status
   const toggleMilestone = async (milestoneId, currentStatus) => {
     const nextStatus = !currentStatus;
-    const completedAt = nextStatus ? new Date().toISOString() : null;
+    const userId = user?.id || null;
 
     setMilestones((prev) => {
       const updated = prev.map((m) =>
-        m.id === milestoneId
-          ? { ...m, is_completed: nextStatus, completed_at: completedAt }
-          : m
+        m.id === milestoneId ? { ...m, is_completed: nextStatus } : m
       );
-
-      updateStoredMilestones(roadmapId, updated);
+      updateStoredMilestones(userId, roadmapId, updated);
       return updated;
     });
 
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(milestoneId);
-    if (isSupabaseConfigured && isUuid) {
+    if (isSupabaseConfigured && user) {
       try {
         await supabase
           .from('milestones')
-          .update({
-            is_completed: nextStatus,
-            completed_at: completedAt,
-          })
+          .update({ is_completed: nextStatus })
           .eq('id', milestoneId);
       } catch (err) {
-        console.warn('Failed to update milestone in cloud:', err);
+        console.error('Failed to toggle milestone in Supabase:', err);
+      }
+    }
+  };
+
+  // Add Dynamic Milestone (Adaptive Reschedule)
+  const addMilestone = async (newMilestoneData) => {
+    const userId = user?.id || null;
+    const msId = crypto.randomUUID ? crypto.randomUUID() : `ms-${Date.now()}`;
+    const newMs = {
+      id: msId,
+      roadmap_id: roadmapId,
+      order_index: milestones.length,
+      title: newMilestoneData.title,
+      description: newMilestoneData.description || '',
+      is_completed: false,
+      is_major: false,
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      xp_reward: 120,
+      deliverables: (newMilestoneData.deliverables || []).map((d, i) => ({
+        id: crypto.randomUUID ? crypto.randomUUID() : `del-${msId}-${i}`,
+        milestone_id: msId,
+        title: typeof d === 'string' ? d : d.title,
+        is_completed: false,
+        order_index: i,
+      })),
+      resources: (newMilestoneData.resources || []).map((r, i) => ({
+        id: crypto.randomUUID ? crypto.randomUUID() : `res-${msId}-${i}`,
+        milestone_id: msId,
+        title: r.title,
+        url: r.url || 'https://google.com',
+        type: r.type || 'docs',
+        order_index: i,
+      })),
+    };
+
+    setMilestones((prev) => {
+      const updated = [...prev, newMs];
+      updateStoredMilestones(userId, roadmapId, updated);
+      return updated;
+    });
+
+    if (isSupabaseConfigured && user) {
+      try {
+        await supabase.from('milestones').insert({
+          id: newMs.id,
+          roadmap_id: newMs.roadmap_id,
+          order_index: newMs.order_index,
+          title: newMs.title,
+          description: newMs.description,
+          is_completed: false,
+          is_major: false,
+          xp_reward: newMs.xp_reward,
+        });
+      } catch (err) {
+        console.warn('Failed to insert adaptive milestone to Supabase:', err);
       }
     }
   };
@@ -180,5 +254,6 @@ export function useRoadmapDetail(roadmapId) {
     refetch: fetchDetail,
     toggleDeliverable,
     toggleMilestone,
+    addMilestone,
   };
 }

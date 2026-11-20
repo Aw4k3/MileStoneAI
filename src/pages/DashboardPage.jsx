@@ -1,5 +1,5 @@
 // src/pages/DashboardPage.jsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -14,7 +14,7 @@ import {
   ChevronRight,
   Award,
   Clock,
-  Database,
+  Compass,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import ProgressRing from '../components/common/ProgressRing';
@@ -24,9 +24,28 @@ import { useRoadmaps } from '../hooks/useRoadmaps';
 import { useStats } from '../hooks/useStats';
 
 export default function DashboardPage() {
-  const { user, isSupabaseConnected } = useAuth();
+  const { user } = useAuth();
   const { roadmaps, milestonesMap, loading: roadmapsLoading } = useRoadmaps();
   const { stats, loading: statsLoading } = useStats();
+
+  // First-time visit detection
+  const visitedKey = user ? `milestone_visited_${user.id}` : 'milestone_visited_guest';
+  const [isFirstVisit, setIsFirstVisit] = useState(() => {
+    return !localStorage.getItem(visitedKey);
+  });
+
+  useEffect(() => {
+    // If the user has roadmaps or XP, they are definitely returning
+    if (roadmaps.length > 0 || (stats && stats.total_xp > 0)) {
+      setIsFirstVisit(false);
+      localStorage.setItem(visitedKey, 'true');
+    } else if (localStorage.getItem(visitedKey)) {
+      setIsFirstVisit(false);
+    } else {
+      // First visit recorded once rendered
+      localStorage.setItem(visitedKey, 'true');
+    }
+  }, [user, roadmaps.length, stats, visitedKey]);
 
   // Calculate global completion rate across all roadmaps
   let totalMilestonesCount = 0;
@@ -58,6 +77,8 @@ export default function DashboardPage() {
     );
   }
 
+  const displayName = user?.display_name || 'Adventurer';
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -67,7 +88,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2.5">
               <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
               <span>
-                <strong>Browsing as Guest:</strong> Your blueprints are saved locally. Sign in to sync across devices and access cloud persistence.
+                <strong>Browsing as Guest:</strong> Your blueprints are saved locally. Sign in with Google to sync across devices and access cloud persistence.
               </span>
             </div>
             <Link
@@ -83,10 +104,16 @@ export default function DashboardPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
-              Welcome back, {user?.display_name || 'Adventurer'} <span className="animate-pulse">👋</span>
+              {isFirstVisit ? (
+                <>Welcome to Milestone AI, {displayName} <span className="animate-pulse">✨</span></>
+              ) : (
+                <>Welcome back, {displayName} <span className="animate-pulse">👋</span></>
+              )}
             </h1>
             <p className="text-sm text-slate-400 mt-1">
-              Your adaptive learning journey is on track. Let’s conquer today’s target.
+              {isFirstVisit
+                ? 'Ready to transform your ambitious goals into structured, adaptive blueprints? Let’s begin.'
+                : 'Your adaptive learning journey is on track. Let’s conquer today’s target.'}
             </p>
           </div>
           <Link
@@ -125,7 +152,7 @@ export default function DashboardPage() {
                 Daily Streak
               </p>
               <p className="text-xl sm:text-2xl font-bold text-slate-100 flex items-center gap-1">
-                {stats?.current_streak || 1} <span className="text-xs font-normal text-amber-400">days</span>
+                {stats?.current_streak || 0} <span className="text-xs font-normal text-amber-400">days</span>
               </p>
             </div>
           </div>
@@ -198,7 +225,7 @@ export default function DashboardPage() {
           </motion.div>
         )}
 
-        {/* Roadmaps Grid */}
+        {/* Roadmaps Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
@@ -211,13 +238,17 @@ export default function DashboardPage() {
           </div>
 
           {roadmaps.length === 0 ? (
-            <div className="card p-12 text-center space-y-3">
-              <Target className="w-10 h-10 text-indigo-400 mx-auto" />
-              <h3 className="text-base font-semibold text-slate-200">No Roadmaps Yet</h3>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                Transform any learning or building goal into an adaptive blueprint.
-              </p>
-              <Link to="/wizard" className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-2 mt-2">
+            <div className="card p-10 sm:p-14 text-center space-y-4 border border-dashed border-slate-700/60">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto text-indigo-400">
+                <Compass className="w-7 h-7" />
+              </div>
+              <div className="space-y-1.5 max-w-sm mx-auto">
+                <h3 className="text-base font-semibold text-slate-200">No Roadmaps Yet</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Turn your ambitious goal into a weekly, adaptive blueprint generated with Gemini AI.
+                </p>
+              </div>
+              <Link to="/wizard" className="btn-primary text-xs py-2.5 px-5 inline-flex items-center gap-2 mt-2">
                 <PlusCircle className="w-4 h-4" />
                 Create First Blueprint
               </Link>
@@ -300,22 +331,30 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {(stats?.badges || []).map((badge) => (
-              <div
-                key={badge.slug}
-                className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-800 hover:border-slate-700 transition-colors flex items-center gap-3"
-              >
-                <div className="text-2xl shrink-0 p-1.5 bg-slate-900 rounded-lg border border-slate-800">
-                  {badge.emoji}
+          {(stats?.badges || []).length === 0 ? (
+            <div className="py-4 text-center">
+              <p className="text-xs text-slate-500">
+                No badges unlocked yet. Complete milestones and pass micro-quizzes to earn badges!
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {(stats?.badges || []).map((badge) => (
+                <div
+                  key={badge.slug}
+                  className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-800 hover:border-slate-700 transition-colors flex items-center gap-3"
+                >
+                  <div className="text-2xl shrink-0 p-1.5 bg-slate-900 rounded-lg border border-slate-800">
+                    {badge.emoji}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-200 truncate">{badge.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{badge.description}</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-200 truncate">{badge.name}</p>
-                  <p className="text-[10px] text-slate-400 truncate">{badge.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </Layout>

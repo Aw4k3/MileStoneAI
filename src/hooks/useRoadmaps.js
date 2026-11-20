@@ -4,32 +4,37 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { MOCK_ROADMAPS, MOCK_MILESTONES } from '../lib/mockData';
 
-const STORAGE_ROADMAPS_KEY = 'milestone_ai_user_roadmaps';
-const STORAGE_MILESTONES_KEY = 'milestone_ai_user_milestones';
+function getRoadmapsStorageKey(userId) {
+  return userId ? `milestone_ai_${userId}_roadmaps` : 'milestone_ai_guest_roadmaps';
+}
 
-// Helper to get local stored blueprints
-function getStoredRoadmaps() {
+function getMilestonesStorageKey(userId) {
+  return userId ? `milestone_ai_${userId}_milestones` : 'milestone_ai_guest_milestones';
+}
+
+// Helper to get local stored blueprints per user
+function getStoredRoadmaps(userId) {
   try {
-    const raw = localStorage.getItem(STORAGE_ROADMAPS_KEY);
+    const raw = localStorage.getItem(getRoadmapsStorageKey(userId));
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-function getStoredMilestonesMap() {
+function getStoredMilestonesMap(userId) {
   try {
-    const raw = localStorage.getItem(STORAGE_MILESTONES_KEY);
+    const raw = localStorage.getItem(getMilestonesStorageKey(userId));
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
   }
 }
 
-function saveLocalRoadmaps(roadmapsList, milestonesMapData) {
+function saveLocalRoadmaps(userId, roadmapsList, milestonesMapData) {
   try {
-    localStorage.setItem(STORAGE_ROADMAPS_KEY, JSON.stringify(roadmapsList));
-    localStorage.setItem(STORAGE_MILESTONES_KEY, JSON.stringify(milestonesMapData));
+    localStorage.setItem(getRoadmapsStorageKey(userId), JSON.stringify(roadmapsList));
+    localStorage.setItem(getMilestonesStorageKey(userId), JSON.stringify(milestonesMapData));
   } catch (err) {
     console.warn('LocalStorage save notice:', err);
   }
@@ -54,14 +59,16 @@ export function useRoadmaps() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch all roadmaps (Hybrid: LocalStorage + Supabase + Starter Samples)
+  // Fetch all roadmaps scoped strictly to the current user
   const fetchRoadmaps = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    // 1. Load local roadmaps from storage
-    const localRoadmaps = getStoredRoadmaps();
-    const localMilestonesMap = getStoredMilestonesMap();
+    const userId = user?.id || null;
+
+    // 1. Load local roadmaps scoped to this user
+    const localRoadmaps = getStoredRoadmaps(userId);
+    const localMilestonesMap = getStoredMilestonesMap(userId);
 
     let combinedRoadmaps = [...localRoadmaps];
     let combinedMilestonesMap = { ...localMilestonesMap };
@@ -88,7 +95,6 @@ export function useRoadmaps() {
               if (!combinedMilestonesMap[m.roadmap_id]) {
                 combinedMilestonesMap[m.roadmap_id] = [];
               }
-              // avoid duplicate milestones
               if (!combinedMilestonesMap[m.roadmap_id].some((x) => x.id === m.id)) {
                 combinedMilestonesMap[m.roadmap_id].push(m);
               }
@@ -107,15 +113,13 @@ export function useRoadmaps() {
       }
     }
 
-    // 3. If still empty, include curated starter blueprints so dashboard is never empty
-    if (combinedRoadmaps.length === 0) {
+    // 3. For guest users without any created roadmaps, show curated starter blueprints
+    if (!user && combinedRoadmaps.length === 0) {
       combinedRoadmaps = [...MOCK_ROADMAPS];
-      combinedMilestonesMap = { ...MOCK_MILESTONES, ...combinedMilestonesMap };
-    } else {
-      // Ensure mock milestones are accessible for any starter blueprints
       combinedMilestonesMap = { ...MOCK_MILESTONES, ...combinedMilestonesMap };
     }
 
+    // Authenticated users with 0 roadmaps get clean empty state ([]), NOT mock roadmaps
     setRoadmaps(combinedRoadmaps);
     setMilestonesMap(combinedMilestonesMap);
     setLoading(false);
@@ -136,13 +140,12 @@ export function useRoadmaps() {
     gemini_model = 'pro',
     milestones = [],
   }) => {
-    // Generate an ID (UUID style so it works both locally and in Postgres)
+    const userId = user?.id || null;
     const newId = crypto.randomUUID ? crypto.randomUUID() : `roadmap-${Date.now()}`;
-    const userId = user?.id || 'guest_user';
 
     const newRoadmap = {
       id: newId,
-      user_id: userId,
+      user_id: user?.id || 'guest_user',
       title: title || 'Custom Learning Blueprint',
       goal_summary: goal_summary || '',
       difficulty,
@@ -189,9 +192,9 @@ export function useRoadmaps() {
       };
     });
 
-    // 1. Immediately persist locally so data is NEVER lost
-    const currentStoredRoadmaps = getStoredRoadmaps();
-    const currentStoredMilestones = getStoredMilestonesMap();
+    // 1. Persist locally to the current user's isolated storage
+    const currentStoredRoadmaps = getStoredRoadmaps(userId);
+    const currentStoredMilestones = getStoredMilestonesMap(userId);
 
     const updatedStoredRoadmaps = [newRoadmap, ...currentStoredRoadmaps];
     const updatedStoredMilestones = {
@@ -199,7 +202,7 @@ export function useRoadmaps() {
       [newId]: formattedMilestones,
     };
 
-    saveLocalRoadmaps(updatedStoredRoadmaps, updatedStoredMilestones);
+    saveLocalRoadmaps(userId, updatedStoredRoadmaps, updatedStoredMilestones);
 
     // Update in-memory state
     setRoadmaps((prev) => [newRoadmap, ...prev.filter((r) => r.id !== newId)]);
@@ -209,7 +212,7 @@ export function useRoadmaps() {
     }));
 
     // 2. If Supabase is connected and user is authenticated, sync to cloud database
-    if (isSupabaseConfigured && user && user.id !== 'guest_user') {
+    if (isSupabaseConfigured && user) {
       try {
         // Ensure profile exists in public.profiles to satisfy foreign key
         await supabase.from('profiles').upsert({
@@ -219,7 +222,7 @@ export function useRoadmaps() {
         });
 
         // Insert roadmap
-        const { data: dbRoadmap, error: rmError } = await supabase
+        const { error: rmError } = await supabase
           .from('roadmaps')
           .insert({
             id: newId,
@@ -232,9 +235,7 @@ export function useRoadmaps() {
             key_outcomes: newRoadmap.key_outcomes,
             gemini_model: newRoadmap.gemini_model,
             status: 'active',
-          })
-          .select()
-          .single();
+          });
 
         if (rmError) throw rmError;
 
@@ -288,11 +289,13 @@ export function useRoadmaps() {
 
   // Delete roadmap
   const deleteRoadmap = async (roadmapId) => {
-    // 1. Remove locally
-    const currentStoredRoadmaps = getStoredRoadmaps().filter((r) => r.id !== roadmapId);
-    const currentStoredMilestones = { ...getStoredMilestonesMap() };
+    const userId = user?.id || null;
+
+    // 1. Remove locally from user's storage
+    const currentStoredRoadmaps = getStoredRoadmaps(userId).filter((r) => r.id !== roadmapId);
+    const currentStoredMilestones = { ...getStoredMilestonesMap(userId) };
     delete currentStoredMilestones[roadmapId];
-    saveLocalRoadmaps(currentStoredRoadmaps, currentStoredMilestones);
+    saveLocalRoadmaps(userId, currentStoredRoadmaps, currentStoredMilestones);
 
     setRoadmaps((prev) => prev.filter((r) => r.id !== roadmapId));
     setMilestonesMap((prev) => {
@@ -304,7 +307,7 @@ export function useRoadmaps() {
     // 2. Remove from Supabase if configured and user is signed in
     if (isSupabaseConfigured && user) {
       try {
-        await supabase.from('roadmaps').delete().eq('id', roadmapId);
+        await supabase.from('roadmaps').delete().eq('id', roadmapId).eq('user_id', user.id);
       } catch (err) {
         console.warn('Supabase delete notice:', err.message);
       }

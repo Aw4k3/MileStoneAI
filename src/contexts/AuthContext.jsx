@@ -10,6 +10,45 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Sync profile & email to public.profiles table
+  const syncProfile = async (authUser) => {
+    if (!authUser || !isSupabaseConfigured) return;
+
+    const email = authUser.email || '';
+    const fullName =
+      authUser.user_metadata?.full_name ||
+      authUser.user_metadata?.name ||
+      email.split('@')[0] ||
+      'Adventurer';
+    const avatar = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
+
+    try {
+      const { error } = await supabase.from('profiles').upsert(
+        {
+          id: authUser.id,
+          email,
+          display_name: fullName,
+          avatar_url: avatar,
+        },
+        { onConflict: 'id' }
+      );
+
+      // If email column doesn't exist yet in database, fallback to without email
+      if (error && error.message?.includes('email')) {
+        await supabase.from('profiles').upsert(
+          {
+            id: authUser.id,
+            display_name: fullName,
+            avatar_url: avatar,
+          },
+          { onConflict: 'id' }
+        );
+      }
+    } catch (err) {
+      console.warn('Profile sync notice:', err.message);
+    }
+  };
+
   // Initialize Auth state
   useEffect(() => {
     let mounted = true;
@@ -24,33 +63,37 @@ export function AuthProvider({ children }) {
         if (mounted) {
           setSession(initialSession);
           if (initialSession?.user) {
+            const authUser = initialSession.user;
             let displayName =
-              initialSession.user.user_metadata?.full_name ||
-              initialSession.user.email?.split('@')[0] ||
+              authUser.user_metadata?.full_name ||
+              authUser.user_metadata?.name ||
+              authUser.email?.split('@')[0] ||
               'Adventurer';
-            let avatarUrl = initialSession.user.user_metadata?.avatar_url || null;
+            let avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
 
             try {
               const { data: profile } = await supabase
                 .from('profiles')
-                .select('display_name, avatar_url')
-                .eq('id', initialSession.user.id)
+                .select('display_name, avatar_url, email')
+                .eq('id', authUser.id)
                 .maybeSingle();
 
               if (profile?.display_name) displayName = profile.display_name;
               if (profile?.avatar_url) avatarUrl = profile.avatar_url;
             } catch {
-              // Non-fatal if table permissions are still propagating
+              // Non-fatal
             }
 
+            // Sync email and metadata to profiles
+            syncProfile(authUser);
+
             setUser({
-              id: initialSession.user.id,
-              email: initialSession.user.email,
+              id: authUser.id,
+              email: authUser.email,
               display_name: displayName,
               avatar_url: avatarUrl,
             });
           } else {
-            // No active session — keep user null so login button / guest state works
             setUser(null);
           }
         }
@@ -68,17 +111,19 @@ export function AuthProvider({ children }) {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       setSession(newSession);
       if (newSession?.user) {
+        const authUser = newSession.user;
         let displayName =
-          newSession.user.user_metadata?.full_name ||
-          newSession.user.email?.split('@')[0] ||
+          authUser.user_metadata?.full_name ||
+          authUser.user_metadata?.name ||
+          authUser.email?.split('@')[0] ||
           'Adventurer';
-        let avatarUrl = newSession.user.user_metadata?.avatar_url || null;
+        let avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
 
         try {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('display_name, avatar_url')
-            .eq('id', newSession.user.id)
+            .select('display_name, avatar_url, email')
+            .eq('id', authUser.id)
             .maybeSingle();
 
           if (profile?.display_name) displayName = profile.display_name;
@@ -87,9 +132,11 @@ export function AuthProvider({ children }) {
           // Non-fatal
         }
 
+        syncProfile(authUser);
+
         setUser({
-          id: newSession.user.id,
-          email: newSession.user.email,
+          id: authUser.id,
+          email: authUser.email,
           display_name: displayName,
           avatar_url: avatarUrl,
         });
@@ -128,15 +175,7 @@ export function AuthProvider({ children }) {
           avatar_url: null,
         });
 
-        // Ensure user profile exists
-        try {
-          await supabase.from('profiles').upsert({
-            id: data.user.id,
-            display_name: displayName,
-          });
-        } catch {
-          // Ignore
-        }
+        await syncProfile(data.user);
       }
 
       return data.user;
@@ -162,22 +201,15 @@ export function AuthProvider({ children }) {
       if (error) throw error;
 
       if (data?.user) {
+        const resolvedName = displayName || data.user.email?.split('@')[0] || 'Adventurer';
         setUser({
           id: data.user.id,
           email: data.user.email,
-          display_name: displayName || data.user.email?.split('@')[0] || 'Adventurer',
+          display_name: resolvedName,
           avatar_url: null,
         });
 
-        // Ensure user profile exists
-        try {
-          await supabase.from('profiles').upsert({
-            id: data.user.id,
-            display_name: displayName || data.user.email?.split('@')[0] || 'Adventurer',
-          });
-        } catch {
-          // Ignore
-        }
+        await syncProfile(data.user);
       }
 
       return data.user;
