@@ -2,6 +2,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import PrivateRoute from './components/common/PrivateRoute';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
@@ -18,10 +19,38 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/wizard" element={<WizardPage />} />
-          <Route path="/roadmap/:id" element={<RoadmapPage />} />
-          <Route path="/roadmap/:id/chat" element={<ChatPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route
+            path="/wizard"
+            element={
+              <PrivateRoute>
+                <WizardPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/roadmap/:id"
+            element={
+              <PrivateRoute>
+                <RoadmapPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/roadmap/:id/chat"
+            element={
+              <PrivateRoute>
+                <ChatPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <PrivateRoute>
+                <SettingsPage />
+              </PrivateRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

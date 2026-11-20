@@ -19,22 +19,22 @@ const features = [
   {
     icon: Target,
     title: 'Adaptive Learning Blueprints',
-    description: 'Transform goals into week-by-week milestones with deliverables and verified resources.',
+    description: 'Transform goals into week-by-week milestones with deliverables and curated resources.',
   },
   {
     icon: Brain,
     title: 'Guardrailed AI Mentor',
-    description: 'A 24/7 Socratic tutor strictly locked to your curriculum context and progress history.',
+    description: 'A 24/7 Socratic tutor strictly locked to your curriculum context and progress.',
   },
   {
     icon: Zap,
     title: 'Gamified Milestone Tracking',
-    description: 'Earn XP, uphold your streak, unlock achievement badges, and conquer gated micro-quizzes.',
+    description: 'Earn XP, uphold streaks, unlock achievement badges, and conquer micro-quizzes.',
   },
   {
     icon: ShieldCheck,
-    title: 'Zero Budget Architecture',
-    description: '100% free-tier stack powered by Google Gemini, Supabase Postgres RLS, and Vercel edge.',
+    title: 'Zero-Key Architecture',
+    description: 'No API keys to manage. AI runs entirely through the cloud engine — free tier.',
   },
 ];
 
@@ -42,7 +42,6 @@ export default function LandingPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-  // If already authenticated or returning with OAuth hash, navigate to dashboard
   useEffect(() => {
     if (window.location.hash?.includes('access_token')) {
       navigate('/dashboard' + window.location.hash, { replace: true });
@@ -50,6 +49,7 @@ export default function LandingPage() {
       navigate('/dashboard', { replace: true });
     }
   }, [user, loading, navigate]);
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
       {/* Top Navbar */}
@@ -63,31 +63,19 @@ export default function LandingPage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          {user ? (
-            <Link
-              to="/dashboard"
-              className="btn-primary text-xs sm:text-sm py-2 px-4 inline-flex items-center gap-1.5"
-            >
-              Open Dashboard
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          ) : (
-            <>
-              <Link
-                to="/auth"
-                className="text-sm font-medium text-slate-300 hover:text-white px-3 py-1.5 transition-colors"
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/wizard"
-                className="btn-primary text-xs sm:text-sm py-2 px-4 inline-flex items-center gap-1.5"
-              >
-                Create Roadmap
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </>
-          )}
+          <Link
+            to="/auth"
+            className="text-sm font-medium text-slate-300 hover:text-white px-3 py-1.5 transition-colors"
+          >
+            Sign In
+          </Link>
+          <Link
+            to="/auth"
+            className="btn-primary text-xs sm:text-sm py-2 px-4 inline-flex items-center gap-1.5"
+          >
+            Get Started
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
       </nav>
 
@@ -106,41 +94,35 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.15] mb-6">
-            Turn natural language goals into{' '}
+            Turn goals into{' '}
             <span className="text-gradient">actionable roadmaps</span>
           </h1>
 
           <p className="text-base sm:text-lg md:text-xl text-slate-400 mb-10 max-w-2xl leading-relaxed">
-            Stop staring at blank calendars. Type what you want to achieve, and let
-            Milestone AI curate time-bound milestones, clickable resources, and a
-            guardrailed AI mentor.
+            Type what you want to achieve, and let Milestone AI curate
+            time-bound milestones, real learning resources, and a
+            guardrailed AI mentor — all powered by Gemini.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full sm:w-auto">
             <Link
-              to="/wizard"
+              to="/auth"
               className="btn-primary w-full sm:w-auto flex items-center justify-center gap-2 text-base px-6 py-3"
             >
               Start Free Blueprint
               <ArrowRight className="w-4 h-4" />
             </Link>
-            <Link
-              to="/dashboard"
-              className="btn-secondary w-full sm:w-auto flex items-center justify-center gap-2 text-base px-6 py-3"
-            >
-              Explore Sample Roadmaps
-            </Link>
           </div>
 
-          {/* Social Proof / Stats Pill */}
+          {/* Stats Pills */}
           <div className="mt-12 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs text-slate-400">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Free Forever ($0 Tier)</span>
+              <span>Free Forever</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-indigo-400" />
-              <span>Dual Gemini Flash / Pro</span>
+              <span>Gemini Flash &amp; Pro</span>
             </div>
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-amber-400" />

@@ -10,17 +10,11 @@ import {
   User,
   Sparkles,
   Zap,
-  Key,
-  ExternalLink,
-  Check,
-  X,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Spinner from '../components/common/Spinner';
-import Modal from '../components/common/Modal';
 import { useRoadmapDetail } from '../hooks/useRoadmapDetail';
 import { useChat } from '../hooks/useChat';
-import { getGeminiApiKey, setGeminiApiKey } from '../lib/gemini';
 import { MENTOR_PERSONAS } from '../lib/constants';
 
 const QUICK_PROMPTS = [
@@ -49,12 +43,6 @@ export default function ChatPage() {
   const [persona, setPersona] = useState('tutor');
   const [geminiModel, setGeminiModel] = useState('flash');
 
-  // API Key Modal State
-  const [hasApiKey, setHasApiKey] = useState(() => Boolean(getGeminiApiKey()));
-  const [showKeyModal, setShowKeyModal] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [keySavedToast, setKeySavedToast] = useState(false);
-
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -70,16 +58,6 @@ export default function ChatPage() {
     if (!query.trim() || isTyping) return;
     sendMessage(query, persona, geminiModel);
     setInputText('');
-  };
-
-  const handleSaveApiKey = (e) => {
-    e.preventDefault();
-    if (!apiKeyInput.trim()) return;
-    setGeminiApiKey(apiKeyInput.trim());
-    setHasApiKey(true);
-    setKeySavedToast(true);
-    setShowKeyModal(false);
-    setTimeout(() => setKeySavedToast(false), 3000);
   };
 
   if (roadmapLoading || chatLoading) {
@@ -159,16 +137,6 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
-
-
-
-        {/* Key Saved Toast */}
-        {keySavedToast && (
-          <div className="p-2 bg-emerald-500/20 border-b border-emerald-500/40 text-emerald-300 text-xs text-center font-medium flex items-center justify-center gap-1.5">
-            <Check className="w-3.5 h-3.5" />
-            Gemini API key saved! Live AI Mentor is active.
-          </div>
-        )}
 
         {/* Messages Stream */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
@@ -273,64 +241,6 @@ export default function ChatPage() {
           </form>
         </div>
       </div>
-
-      {/* Gemini API Key Modal */}
-      <Modal
-        isOpen={showKeyModal}
-        onClose={() => setShowKeyModal(false)}
-        title="Connect Google Gemini API Key"
-      >
-        <form onSubmit={handleSaveApiKey} className="space-y-4">
-          <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs space-y-1.5">
-            <p className="font-bold flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-              100% Free Live AI Mentor & Roadmap Generation
-            </p>
-            <p className="text-slate-300">
-              Get a free API key in 10 seconds from Google AI Studio. No credit card required.
-            </p>
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-bold underline text-indigo-400 hover:text-white inline-flex items-center gap-1 mt-1"
-            >
-              Get Free Key from Google AI Studio <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-              Paste Gemini API Key
-            </label>
-            <input
-              type="password"
-              required
-              value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-              placeholder="AIzaSy..."
-              className="input-field text-xs font-mono"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowKeyModal(false)}
-              className="btn-secondary text-xs py-2 px-4"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
-            >
-              <Check className="w-3.5 h-3.5" />
-              Save & Activate
-            </button>
-          </div>
-        </form>
-      </Modal>
     </Layout>
   );
 }

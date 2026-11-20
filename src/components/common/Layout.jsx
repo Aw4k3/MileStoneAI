@@ -23,7 +23,7 @@ export default function Layout({ children }) {
 
   const navLinks = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'New Blueprint', path: '/wizard', icon: PlusCircle },
+    { label: 'New Blueprint', path: user ? '/wizard' : '/auth', icon: PlusCircle },
     { label: 'Settings', path: '/settings', icon: Settings },
   ];
 
@@ -57,7 +57,7 @@ export default function Layout({ children }) {
               const isActive = location.pathname === link.path;
               return (
                 <Link
-                  key={link.path}
+                  key={link.label}
                   to={link.path}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
                     isActive
@@ -118,7 +118,7 @@ export default function Layout({ children }) {
             const isActive = location.pathname === link.path;
             return (
               <Link
-                key={link.path}
+                key={link.label}
                 to={link.path}
                 className={`flex flex-col items-center gap-1 py-1 px-3 transition-colors ${
                   isActive ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'

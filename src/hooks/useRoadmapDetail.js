@@ -124,10 +124,9 @@ export function useRoadmapDetail(roadmapId) {
       }
     }
 
-    // Fallback default
-    const fallbackRm = MOCK_ROADMAPS[0];
-    setRoadmap(fallbackRm);
-    setMilestones(MOCK_MILESTONES[fallbackRm.id] || []);
+    // Not found anywhere
+    setRoadmap(null);
+    setMilestones([]);
     setLoading(false);
   }, [roadmapId, user]);
 

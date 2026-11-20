@@ -1,6 +1,6 @@
 // src/pages/DashboardPage.jsx
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Trophy,
@@ -25,27 +25,37 @@ import { useStats } from '../hooks/useStats';
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const { roadmaps, milestonesMap, loading: roadmapsLoading } = useRoadmaps();
   const { stats, loading: statsLoading } = useStats();
 
-  // First-time visit detection
-  const visitedKey = user ? `milestone_visited_${user.id}` : 'milestone_visited_guest';
+  // Redirect unauthenticated users to sign in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
+
+  // First-time visit detection (only for authenticated users)
+  const visitedKey = user ? `milestone_visited_${user.id}` : null;
   const [isFirstVisit, setIsFirstVisit] = useState(() => {
-    return !localStorage.getItem(visitedKey);
+    if (!user) return true; // guests always see welcome (but they'll be redirected anyway)
+    return !localStorage.getItem(`milestone_visited_${user.id}`);
   });
 
   useEffect(() => {
-    if (authLoading) return;
-
-    if (roadmaps.length > 0 || (stats && stats.total_xp > 0)) {
-      setIsFirstVisit(false);
-      localStorage.setItem(visitedKey, 'true');
-    } else if (localStorage.getItem(visitedKey)) {
-      setIsFirstVisit(false);
+    if (authLoading || !user) return;
+    if (!localStorage.getItem(`milestone_visited_${user.id}`)) {
+      setIsFirstVisit(true);
     } else {
-      localStorage.setItem(visitedKey, 'true');
+      setIsFirstVisit(false);
     }
-  }, [user, roadmaps.length, stats, visitedKey, authLoading]);
+    // Mark as visited after a short delay so they see the welcome message first
+    const t = setTimeout(() => {
+      localStorage.setItem(`milestone_visited_${user.id}`, 'true');
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [user, authLoading]);
 
   // Calculate global completion rate across all roadmaps
   let totalMilestonesCount = 0;
@@ -83,24 +93,6 @@ export default function DashboardPage() {
   return (
     <Layout>
       <div className="space-y-8">
-        {/* Guest Mode Cloud Sync Banner */}
-        {!user && (
-          <div className="p-3 sm:p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-2.5">
-              <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
-              <span>
-                <strong>Browsing as Guest:</strong> Your blueprints are saved locally. Sign in with Google to sync across devices and access cloud persistence.
-              </span>
-            </div>
-            <Link
-              to="/auth"
-              className="text-xs font-bold text-indigo-400 hover:text-white underline shrink-0 ml-3"
-            >
-              Sign In / Up →
-            </Link>
-          </div>
-        )}
-
         {/* Welcome Banner */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
           <div>
@@ -113,8 +105,8 @@ export default function DashboardPage() {
             </h1>
             <p className="text-sm text-slate-400 mt-1">
               {isFirstVisit
-                ? 'Ready to transform your ambitious goals into structured, adaptive blueprints? Let’s begin.'
-                : 'Your adaptive learning journey is on track. Let’s conquer today’s target.'}
+                ? 'Ready to transform your ambitious goals into structured, adaptive blueprints? Let\'s begin.'
+                : 'Your adaptive learning journey is on track. Let\'s conquer today\'s target.'}
             </p>
           </div>
           <Link
