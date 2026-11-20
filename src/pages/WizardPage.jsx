@@ -1,6 +1,6 @@
 // src/pages/WizardPage.jsx
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight,
@@ -33,6 +33,7 @@ const MILESTONE_COUNT_OPTIONS = [4, 6, 8, 10, 12, 16];
 
 export default function WizardPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { createRoadmap } = useRoadmaps();
 
   const [step, setStep] = useState(0);
@@ -57,6 +58,14 @@ export default function WizardPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStepText, setGenerationStepText] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Prepopulate goal from URL params if present
+  useEffect(() => {
+    const goalParam = searchParams.get('goal');
+    if (goalParam && !goal) {
+      setGoal(goalParam);
+    }
+  }, [searchParams]);
 
   const handleSelectTemplate = (template) => {
     setGoal(template.goal);
@@ -122,7 +131,7 @@ export default function WizardPage() {
   const handleGenerate = async () => {
     setIsGenerating(true);
     setErrorMessage('');
-    setGenerationStepText('Synthesizing structured curriculum blueprint with Gemini AI...');
+    setGenerationStepText('Synthesizing structured curriculum blueprint with Gemini AI…');
 
     let generatedRoadmapId = null;
 
@@ -135,9 +144,9 @@ export default function WizardPage() {
         target_milestones: targetMilestones,
       });
 
-      setGenerationStepText(`Generated ${aiData?.milestones?.length || targetMilestones} comprehensive milestones with verified resources...`);
+      setGenerationStepText(`Generated ${aiData?.milestones?.length || targetMilestones} comprehensive milestones with verified resources…`);
 
-      const finalTitle = selectedTitle || aiData?.title || (goal.length > 50 ? `${goal.slice(0, 48)}...` : goal);
+      const finalTitle = selectedTitle || aiData?.title || (goal.length > 50 ? `${goal.slice(0, 48)}…` : goal);
 
       const created = await createRoadmap({
         title: finalTitle,
@@ -154,7 +163,7 @@ export default function WizardPage() {
       });
 
       generatedRoadmapId = created?.id;
-      setGenerationStepText('Finalizing roadmap records and deliverables...');
+      setGenerationStepText('Finalizing roadmap records and deliverables…');
 
       setTimeout(() => {
         setIsGenerating(false);
@@ -164,7 +173,7 @@ export default function WizardPage() {
       console.error('Roadmap synthesis error:', err);
       try {
         const fallback = await createRoadmap({
-          title: selectedTitle || (goal.length > 50 ? `${goal.slice(0, 48)}...` : goal),
+          title: selectedTitle || (goal.length > 50 ? `${goal.slice(0, 48)}…` : goal),
           goal_summary: goal,
           difficulty,
           duration_months: durationMonths,
@@ -202,7 +211,7 @@ export default function WizardPage() {
         <div className="mb-6 pb-4 border-b border-[#1e293b] flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <span className={`font-mono font-bold px-2 py-0.5 rounded text-[11px] ${
-              step === 0 ? 'bg-blue-600 text-white' : 'bg-[#1a2332] text-slate-400'
+              step === 0 ? 'bg-blue-600 text-white shadow-xs' : 'bg-[#1a2332] text-slate-400'
             }`}>
               01
             </span>
@@ -211,7 +220,7 @@ export default function WizardPage() {
             </span>
             <span className="text-slate-600">/</span>
             <span className={`font-mono font-bold px-2 py-0.5 rounded text-[11px] ${
-              step === 1 ? 'bg-blue-600 text-white' : 'bg-[#1a2332] text-slate-400'
+              step === 1 ? 'bg-blue-600 text-white shadow-xs' : 'bg-[#1a2332] text-slate-400'
             }`}>
               02
             </span>
@@ -220,7 +229,7 @@ export default function WizardPage() {
             </span>
           </div>
 
-          <span className="font-mono text-slate-400 hidden sm:inline">
+          <span className="font-mono text-slate-400 hidden sm:inline tnum">
             Step {step + 1} of 2
           </span>
         </div>
@@ -246,16 +255,21 @@ export default function WizardPage() {
               >
                 <div>
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Target className="w-5 h-5 text-blue-400" />
+                    <Target className="w-5 h-5 text-blue-400" aria-hidden="true" />
                     What do you want to master or build?
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                  <p className="text-xs sm:text-sm text-slate-300 mt-1">
                     Describe your end goal in natural language. Gemini will analyze prerequisites and build a sequential milestone path.
                   </p>
                 </div>
 
                 <div className="space-y-3">
+                  <label htmlFor="goal-input" className="sr-only">
+                    What do you want to master or build?
+                  </label>
                   <textarea
+                    id="goal-input"
+                    name="goal"
                     rows={4}
                     value={goal}
                     onChange={(e) => {
@@ -264,19 +278,19 @@ export default function WizardPage() {
                         setSelectedTitle('');
                       }
                     }}
-                    placeholder="e.g. Master Full-Stack AI SaaS engineering with Next.js, Stripe subscriptions, and PostgreSQL to ship production software..."
+                    placeholder="e.g. Master Full-Stack AI SaaS engineering with Next.js, Stripe subscriptions, and PostgreSQL to ship production software…"
                     className="input-field resize-none text-xs sm:text-sm leading-relaxed"
                   />
                   <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-slate-400">
-                    <span className="text-[11px] text-slate-500">Be concrete about your technology stack or target deliverables</span>
+                    <span className="text-[11px] text-slate-400">Be concrete about your technology stack or target deliverables</span>
                     <button
                       type="button"
                       onClick={handleSuggestTitles}
                       disabled={!goal.trim() || isSuggestingTitles}
                       className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-40 flex items-center gap-1.5 font-medium transition-colors"
                     >
-                      <Wand2 className={`w-3.5 h-3.5 ${isSuggestingTitles ? 'animate-spin' : ''}`} />
-                      {isSuggestingTitles ? 'Generating Titles...' : 'Suggest Formal Titles'}
+                      <Wand2 className={`w-3.5 h-3.5 ${isSuggestingTitles ? 'animate-spin' : ''}`} aria-hidden="true" />
+                      {isSuggestingTitles ? 'Generating Titles…' : 'Suggest Formal Titles'}
                     </button>
                   </div>
                 </div>
@@ -295,14 +309,14 @@ export default function WizardPage() {
                             key={title}
                             type="button"
                             onClick={() => setSelectedTitle(title)}
-                            className={`p-2.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between gap-2 ${
+                            className={`p-2.5 rounded-lg border text-left text-xs transition-colors flex items-center justify-between gap-2 ${
                               isChosen
                                 ? 'bg-blue-600/10 border-blue-500 text-white font-semibold'
                                 : 'bg-[#121824] border-[#242f42] text-slate-300 hover:border-[#3b4c68]'
                             }`}
                           >
                             <span>{title}</span>
-                            {isChosen && <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                            {isChosen && <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" aria-hidden="true" />}
                           </button>
                         );
                       })}
@@ -321,7 +335,7 @@ export default function WizardPage() {
                         key={tmpl.id}
                         type="button"
                         onClick={() => handleSelectTemplate(tmpl)}
-                        className={`text-left p-3.5 rounded-xl border text-xs transition-all flex items-start gap-3 ${
+                        className={`text-left p-3.5 rounded-xl border text-xs transition-colors flex items-start gap-3 ${
                           goal === tmpl.goal
                             ? 'bg-blue-600/10 border-blue-500 text-white'
                             : 'bg-[#0e141f] border-[#242f42] hover:border-[#3b4c68] text-slate-300'
@@ -333,7 +347,7 @@ export default function WizardPage() {
                         <div className="min-w-0">
                           <p className="font-semibold text-white">{tmpl.title}</p>
                           <p className="text-slate-400 line-clamp-1 mt-0.5 text-[11px]">{tmpl.goal}</p>
-                          <span className="inline-block mt-1 text-[10px] font-mono text-blue-400">
+                          <span className="inline-block mt-1 text-[10px] font-mono text-blue-400 tnum">
                             {tmpl.duration} mo · {tmpl.difficulty}
                           </span>
                         </div>
@@ -351,7 +365,7 @@ export default function WizardPage() {
                     className="btn-primary text-xs py-2.5 px-5"
                   >
                     Continue to Timeline &amp; Pacing
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                   </button>
                 </div>
               </motion.div>
@@ -369,10 +383,10 @@ export default function WizardPage() {
               >
                 <div>
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Sliders className="w-5 h-5 text-blue-400" />
+                    <Sliders className="w-5 h-5 text-blue-400" aria-hidden="true" />
                     Timeline, Pacing &amp; Milestone Count
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                  <p className="text-xs sm:text-sm text-slate-300 mt-1">
                     Calibrate the total duration, milestone count, and execution frequency for your curriculum.
                   </p>
                 </div>
@@ -382,7 +396,7 @@ export default function WizardPage() {
                   <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-500/30 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-blue-300 flex items-center gap-1.5 font-mono">
-                        <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                        <Sparkles className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
                         AI Timeline Calibration
                       </span>
                       <button
@@ -398,20 +412,20 @@ export default function WizardPage() {
                     </p>
                     <div className="flex flex-wrap gap-2 pt-1 font-mono text-[11px]">
                       <span className="px-2 py-0.5 rounded bg-[#0b0f17] border border-[#242f42] text-slate-300">
-                        Duration: <strong className="text-blue-400">{aiDurationSuggestion.recommended_months} mo</strong>
+                        Duration: <strong className="text-blue-400 tnum">{aiDurationSuggestion.recommended_months} mo</strong>
                       </span>
                       <span className="px-2 py-0.5 rounded bg-[#0b0f17] border border-[#242f42] text-slate-300">
                         Pacing: <strong className="text-blue-400 capitalize">{aiDurationSuggestion.recommended_pacing || 'weekly'}</strong>
                       </span>
                       <span className="px-2 py-0.5 rounded bg-[#0b0f17] border border-[#242f42] text-slate-300">
-                        Milestones: <strong className="text-blue-400">{aiDurationSuggestion.recommended_milestones || 8}</strong>
+                        Milestones: <strong className="text-blue-400 tnum">{aiDurationSuggestion.recommended_milestones || 8}</strong>
                       </span>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] text-xs">
                     <span className="text-slate-400 flex items-center gap-1.5 font-mono">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                      <Sparkles className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
                       Auto-estimate timeline with Gemini
                     </span>
                     <button
@@ -420,7 +434,7 @@ export default function WizardPage() {
                       disabled={isEstimatingDuration}
                       className="text-xs text-blue-400 hover:text-white font-medium"
                     >
-                      {isEstimatingDuration ? 'Analyzing Goal...' : 'Estimate Duration'}
+                      {isEstimatingDuration ? 'Analyzing Goal…' : 'Estimate Duration'}
                     </button>
                   </div>
                 )}
@@ -429,10 +443,10 @@ export default function WizardPage() {
                 <div className="space-y-2.5">
                   <div className="flex justify-between items-center text-xs">
                     <label className="font-semibold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-blue-400" />
+                      <Layers className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
                       Milestone Count
                     </label>
-                    <span className="font-mono font-bold text-blue-400">{targetMilestones} Milestones</span>
+                    <span className="font-mono font-bold text-blue-400 tnum">{targetMilestones} Milestones</span>
                   </div>
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                     {MILESTONE_COUNT_OPTIONS.map((count) => {
@@ -442,13 +456,13 @@ export default function WizardPage() {
                           key={count}
                           type="button"
                           onClick={() => setTargetMilestones(count)}
-                          className={`p-2.5 rounded-xl border text-center transition-all ${
+                          className={`p-2.5 rounded-xl border text-center transition-colors ${
                             isSelected
                               ? 'bg-blue-600/10 border-blue-500 text-white font-bold'
                               : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200 hover:border-[#3b4c68]'
                           }`}
                         >
-                          <div className="text-sm font-semibold font-mono">{count}</div>
+                          <div className="text-sm font-semibold font-mono tnum">{count}</div>
                           <div className="text-[10px] text-slate-500">Milestones</div>
                         </button>
                       );
@@ -459,21 +473,27 @@ export default function WizardPage() {
                 {/* Duration Slider */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-xs">
-                    <label className="font-semibold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                    <label htmlFor="duration-slider" className="font-semibold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
                       Course Duration
                     </label>
-                    <span className="font-mono font-bold text-blue-400">{durationMonths} Months</span>
+                    <span className="font-mono font-bold text-blue-400 tnum">{durationMonths} Months</span>
                   </div>
                   <input
+                    id="duration-slider"
+                    name="duration"
                     type="range"
                     min={1}
                     max={24}
                     value={durationMonths}
+                    aria-label="Course duration in months"
+                    aria-valuemin={1}
+                    aria-valuemax={24}
+                    aria-valuenow={durationMonths}
                     onChange={(e) => setDurationMonths(Number(e.target.value))}
                     className="w-full accent-blue-600 h-2 bg-[#0e141f] rounded-lg cursor-pointer"
                   />
-                  <div className="flex justify-between text-[11px] text-slate-500 font-mono">
+                  <div className="flex justify-between text-[11px] text-slate-500 font-mono tnum">
                     <span>1 mo (Sprint)</span>
                     <span>3 mo</span>
                     <span>6 mo</span>
@@ -493,7 +513,7 @@ export default function WizardPage() {
                         key={opt.value}
                         type="button"
                         onClick={() => setPacing(opt.value)}
-                        className={`p-3 rounded-xl border text-left text-xs transition-all ${
+                        className={`p-3 rounded-xl border text-left text-xs transition-colors ${
                           pacing === opt.value
                             ? 'bg-blue-600/10 border-blue-500 text-white'
                             : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200 hover:border-[#3b4c68]'
@@ -506,9 +526,18 @@ export default function WizardPage() {
                   </div>
 
                   {isOverloadBlocked && (
-                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 shrink-0" />
-                      <span>Daily pacing is restricted on plans longer than 6 months to prevent burnout.</span>
+                    <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
+                        <span>Daily pacing is restricted on plans longer than 6 months to prevent learner burnout.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPacing('weekly')}
+                        className="px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-semibold text-[11px] self-start sm:self-auto shrink-0 transition-colors"
+                      >
+                        Switch to Weekly Pacing
+                      </button>
                     </div>
                   )}
                 </div>
@@ -526,7 +555,7 @@ export default function WizardPage() {
                           key={level}
                           type="button"
                           onClick={() => setDifficulty(level)}
-                          className={`p-2.5 rounded-xl border text-center text-xs capitalize transition-all ${
+                          className={`p-2.5 rounded-xl border text-center text-xs capitalize transition-colors ${
                             isSelected
                               ? 'bg-blue-600/10 border-blue-500 text-white font-semibold'
                               : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200'
@@ -547,7 +576,7 @@ export default function WizardPage() {
                   <p className="text-slate-200 font-sans font-semibold text-sm">
                     {selectedTitle || goal}
                   </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#1e293b] text-[11px]">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#1e293b] text-[11px] tnum">
                     <div>
                       <span className="text-slate-500">Difficulty</span>
                       <p className="text-white capitalize">{difficulty}</p>
@@ -575,7 +604,7 @@ export default function WizardPage() {
                         {generationStepText}
                       </p>
                       <p className="text-xs text-slate-400 font-mono">
-                        Synthesizing verified documentation and deliverables...
+                        Synthesizing verified documentation and deliverables…
                       </p>
                     </div>
                   </div>
@@ -586,7 +615,7 @@ export default function WizardPage() {
                       onClick={() => setStep(0)}
                       className="btn-secondary text-xs py-2 px-4 inline-flex items-center gap-1.5"
                     >
-                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
                       Back to Objective
                     </button>
                     <button

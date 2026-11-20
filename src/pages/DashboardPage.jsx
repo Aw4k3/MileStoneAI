@@ -2,9 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Trophy,
   Flame,
-  Target,
   PlusCircle,
   Calendar,
   Layers,
@@ -13,6 +11,10 @@ import {
   Clock,
   Compass,
   CheckCircle2,
+  Sparkles,
+  ArrowRight,
+  Target,
+  Zap,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import ProgressRing from '../components/common/ProgressRing';
@@ -20,6 +22,12 @@ import Spinner from '../components/common/Spinner';
 import { useAuth } from '../contexts/AuthContext';
 import { useRoadmaps } from '../hooks/useRoadmaps';
 import { useStats } from '../hooks/useStats';
+
+const STARTER_SUGGESTIONS = [
+  'Full-Stack Machine Learning Engineering',
+  'Rust Systems & Microservices',
+  'Distributed Systems in Go',
+];
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
@@ -33,7 +41,6 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, navigate]);
 
-  const visitedKey = user ? `milestone_visited_${user.id}` : null;
   const [isFirstVisit, setIsFirstVisit] = useState(() => {
     if (!user) return true;
     return !localStorage.getItem(`milestone_visited_${user.id}`);
@@ -74,7 +81,7 @@ export default function DashboardPage() {
       <Layout>
         <div className="py-24 flex flex-col items-center justify-center space-y-3">
           <Spinner size="lg" />
-          <p className="text-xs text-slate-400 font-mono">Loading curriculum state...</p>
+          <p className="text-xs text-slate-400 font-mono">Loading curriculum state…</p>
         </div>
       </Layout>
     );
@@ -86,46 +93,46 @@ export default function DashboardPage() {
     <Layout>
       <div className="space-y-8">
         {/* Welcome Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#1e293b]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1e293b]">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
               {isFirstVisit ? `Welcome, ${displayName}` : `Welcome back, ${displayName}`}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
               {isFirstVisit
-                ? 'Create your first structured blueprint or continue an active milestone.'
-                : 'Your curriculum milestones and active mentor context are ready.'}
+                ? 'Create your first structured blueprint or explore the active curriculum milestones below.'
+                : 'Your curriculum milestones and active mentor context are synced and ready.'}
             </p>
           </div>
           <Link
             to="/wizard"
-            className="btn-primary self-start sm:self-auto text-xs py-2 px-4 inline-flex items-center gap-2"
+            className="btn-primary self-start sm:self-auto text-xs py-2 px-4 inline-flex items-center gap-2 shadow-sm"
           >
-            <PlusCircle className="w-3.5 h-3.5" />
+            <PlusCircle className="w-3.5 h-3.5" aria-hidden="true" />
             New Blueprint
           </Link>
         </div>
 
-        {/* Unified Command Metrics Bar */}
+        {/* Command Metrics Bar with Tabular Figures */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-[#121824] border border-[#242f42] rounded-2xl p-4 sm:p-5">
           <div className="space-y-1 pr-4 border-r border-[#1e293b]/80">
             <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Active Blueprints</span>
-            <p className="text-2xl font-bold font-mono text-white">
+            <p className="text-2xl font-bold font-mono tnum text-white">
               {roadmaps.filter((r) => r.status === 'active').length}
             </p>
           </div>
 
           <div className="space-y-1 sm:pl-4 lg:pr-4 sm:border-r border-[#1e293b]/80">
             <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Current Streak</span>
-            <p className="text-2xl font-bold font-mono text-amber-400 flex items-center gap-1.5">
-              <Flame className="w-4 h-4 fill-amber-400 text-amber-400" />
+            <p className="text-2xl font-bold font-mono tnum text-amber-400 flex items-center gap-1.5">
+              <Flame className="w-4 h-4 fill-amber-400 text-amber-400" aria-hidden="true" />
               {stats?.current_streak || 0}d
             </p>
           </div>
 
           <div className="space-y-1 lg:pl-4 pr-4 border-r border-[#1e293b]/80">
             <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Earned XP</span>
-            <p className="text-2xl font-bold font-mono text-blue-400">
+            <p className="text-2xl font-bold font-mono tnum text-blue-400">
               {(stats?.total_xp || 0).toLocaleString()}
             </p>
           </div>
@@ -133,7 +140,7 @@ export default function DashboardPage() {
           <div className="space-y-1 pl-4 flex items-center justify-between">
             <div>
               <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Milestones</span>
-              <p className="text-2xl font-bold font-mono text-white">
+              <p className="text-2xl font-bold font-mono tnum text-white">
                 {completedMilestonesCount}<span className="text-slate-500 text-base">/{totalMilestonesCount}</span>
               </p>
             </div>
@@ -147,10 +154,10 @@ export default function DashboardPage() {
             <div className="space-y-2 max-w-xl">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">
-                  Active Blueprint
+                  Active Curriculum
                 </span>
                 <span className="text-xs text-slate-400 font-mono">
-                  {activeBlueprint.duration_months} mo · {activeBlueprint.pacing}
+                  {activeBlueprint.duration_months} mo · {activeBlueprint.pacing} pacing
                 </span>
               </div>
               <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
@@ -158,19 +165,27 @@ export default function DashboardPage() {
               </h2>
               {nextMilestone && (
                 <p className="text-xs text-slate-300 flex items-center gap-2 pt-0.5">
-                  <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" aria-hidden="true" />
                   <span className="text-slate-400">Current target:</span>
                   <span className="font-medium text-slate-200 truncate">{nextMilestone.title}</span>
                 </p>
               )}
             </div>
 
-            <Link
-              to={`/roadmap/${activeBlueprint.id}`}
-              className="btn-primary self-start md:self-auto shrink-0 py-2.5 px-5 text-xs font-semibold"
-            >
-              Continue Milestone
-            </Link>
+            <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0">
+              <Link
+                to={`/roadmap/${activeBlueprint.id}/chat`}
+                className="btn-secondary py-2.5 px-4 text-xs font-medium"
+              >
+                AI Mentor
+              </Link>
+              <Link
+                to={`/roadmap/${activeBlueprint.id}`}
+                className="btn-primary py-2.5 px-5 text-xs font-semibold"
+              >
+                Continue Milestone
+              </Link>
+            </div>
           </div>
         )}
 
@@ -178,29 +193,45 @@ export default function DashboardPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-blue-400" />
+              <Layers className="w-4 h-4 text-blue-400" aria-hidden="true" />
               Your Blueprints
             </h2>
-            <span className="text-xs font-mono text-slate-400">
+            <span className="text-xs font-mono text-slate-400 tnum">
               {roadmaps.length} total
             </span>
           </div>
 
           {roadmaps.length === 0 ? (
-            <div className="p-10 sm:p-14 text-center space-y-4 border border-dashed border-[#242f42] rounded-2xl bg-[#0e141f]">
+            <div className="p-8 sm:p-12 text-center space-y-5 border border-dashed border-[#242f42] rounded-2xl bg-[#0e141f]">
               <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mx-auto text-blue-400">
-                <Compass className="w-6 h-6" />
+                <Compass className="w-6 h-6" aria-hidden="true" />
               </div>
-              <div className="space-y-1 max-w-sm mx-auto">
-                <h3 className="text-sm font-bold text-white">No Blueprints Formulated Yet</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
+              <div className="space-y-1.5 max-w-sm mx-auto">
+                <h3 className="text-base font-bold text-white">No Blueprints Formulated Yet</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
                   Enter your goal to generate a sequenced curriculum with verified deliverables and an AI mentor.
                 </p>
               </div>
-              <Link to="/wizard" className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5 mt-2">
-                <PlusCircle className="w-3.5 h-3.5" />
-                Formulate Blueprint
-              </Link>
+
+              {/* Starter Suggestions */}
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                {STARTER_SUGGESTIONS.map((s) => (
+                  <Link
+                    key={s}
+                    to={`/wizard?goal=${encodeURIComponent(s)}`}
+                    className="px-3 py-1.5 rounded-lg bg-[#161f2e] border border-[#242f42] text-xs font-mono text-slate-300 hover:text-white hover:border-blue-500/40 transition-colors"
+                  >
+                    + {s}
+                  </Link>
+                ))}
+              </div>
+
+              <div>
+                <Link to="/wizard" className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5">
+                  <PlusCircle className="w-3.5 h-3.5" aria-hidden="true" />
+                  Formulate Blueprint
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -221,7 +252,7 @@ export default function DashboardPage() {
                   <Link
                     key={roadmap.id}
                     to={`/roadmap/${roadmap.id}`}
-                    className="p-5 rounded-2xl bg-[#121824] border border-[#242f42] hover:border-[#3b4c68] transition-all flex flex-col justify-between group"
+                    className="p-5 rounded-2xl bg-[#121824] border border-[#242f42] hover:border-[#3b4c68] transition-colors flex flex-col justify-between group"
                   >
                     <div className="space-y-2.5">
                       <div className="flex items-start justify-between gap-3">
@@ -235,7 +266,7 @@ export default function DashboardPage() {
                               {roadmap.difficulty}
                             </span>
                             <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
+                              <Calendar className="w-3 h-3" aria-hidden="true" />
                               {roadmap.duration_months} mo · {roadmap.pacing}
                             </span>
                           </div>
@@ -246,18 +277,18 @@ export default function DashboardPage() {
                         <ProgressRing progress={percent} size={44} strokeWidth={4} />
                       </div>
 
-                      <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
                         {roadmap.goal_summary}
                       </p>
                     </div>
 
                     <div className="pt-4 mt-4 border-t border-[#1e293b] flex items-center justify-between text-xs text-slate-400">
-                      <span className="flex items-center gap-1.5 font-mono text-[11px]">
+                      <span className="flex items-center gap-1.5 font-mono text-[11px] tnum">
                         <span className={`w-1.5 h-1.5 rounded-full ${roadmap.status === 'completed' ? 'bg-emerald-400' : 'bg-blue-400'}`} />
                         {completedCount} of {milestones.length} milestones complete
                       </span>
                       <span className="text-blue-400 flex items-center gap-0.5 font-medium group-hover:translate-x-0.5 transition-transform">
-                        View Plan <ChevronRight className="w-3.5 h-3.5" />
+                        View Plan <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
                       </span>
                     </div>
                   </Link>
@@ -271,10 +302,10 @@ export default function DashboardPage() {
         <div className="p-5 sm:p-6 rounded-2xl bg-[#121824] border border-[#242f42] space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Award className="w-4 h-4 text-amber-400" />
+              <Award className="w-4 h-4 text-amber-400" aria-hidden="true" />
               Verified Badges
             </h2>
-            <span className="text-xs font-mono text-slate-400">
+            <span className="text-xs font-mono text-slate-400 tnum">
               {(stats?.badges || []).length} unlocked
             </span>
           </div>

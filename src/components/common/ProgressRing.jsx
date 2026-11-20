@@ -16,7 +16,12 @@ export default function ProgressRing({
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center ${className}`}
+      role="progressbar"
+      aria-valuenow={safeProgress}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label="Progress completion"
+      className={`relative inline-flex items-center justify-center shrink-0 ${className}`}
       style={{ width: size, height: size }}
     >
       <svg
@@ -24,6 +29,7 @@ export default function ProgressRing({
         height={size}
         viewBox={`0 0 ${size} ${size}`}
         className="transform -rotate-90"
+        aria-hidden="true"
       >
         {/* Background track circle */}
         <circle
@@ -51,14 +57,14 @@ export default function ProgressRing({
         />
         <defs>
           <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#818cf8" />
-            <stop offset="100%" stopColor="#6366f1" />
+            <stop offset="0%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#2563eb" />
           </linearGradient>
         </defs>
       </svg>
       {showLabel && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-xs font-bold tracking-tight text-slate-100">
+          <span className="text-xs font-bold tracking-tight text-white font-mono tnum">
             {safeProgress}%
           </span>
         </div>

@@ -12,6 +12,9 @@ import {
   Key,
   ExternalLink,
   RefreshCw,
+  Shield,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Modal from '../components/common/Modal';
@@ -34,6 +37,7 @@ export default function SettingsPage() {
 
   const [savedNotice, setSavedNotice] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
   const [apiKeySaved, setApiKeySaved] = useState(false);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -118,7 +122,7 @@ export default function SettingsPage() {
       <Layout>
         <div className="py-24 flex flex-col items-center justify-center space-y-3">
           <Spinner size="lg" />
-          <p className="text-xs text-slate-400 font-mono">Loading user preferences...</p>
+          <p className="text-xs text-slate-400 font-mono">Loading user preferences…</p>
         </div>
       </Layout>
     );
@@ -131,10 +135,10 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between pb-3 border-b border-[#1e293b]">
           <div>
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <SettingsIcon className="w-5 h-5 text-blue-400" />
+              <SettingsIcon className="w-5 h-5 text-blue-400" aria-hidden="true" />
               Settings &amp; Preferences
             </h1>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-300 mt-1">
               Configure your mentor personality, optional API credentials, and manage application data.
             </p>
           </div>
@@ -147,7 +151,7 @@ export default function SettingsPage() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-semibold flex items-center gap-1.5"
               >
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <Check className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
                 Saved
               </motion.div>
             )}
@@ -155,8 +159,8 @@ export default function SettingsPage() {
         </div>
 
         {dataWiped && (
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
-            All user records wiped. Redirecting to landing page...
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs" role="alert" aria-live="polite">
+            All user records wiped. Redirecting to landing page…
           </div>
         )}
 
@@ -164,7 +168,7 @@ export default function SettingsPage() {
         <div className="p-5 sm:p-6 rounded-2xl bg-[#121824] border border-[#242f42] space-y-3.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <Key className="w-4 h-4 text-blue-400" />
+              <Key className="w-4 h-4 text-blue-400" aria-hidden="true" />
               <div>
                 <h2 className="text-sm font-bold text-white">Google Gemini Cloud Engine</h2>
                 <p className="text-xs text-slate-400">
@@ -178,18 +182,33 @@ export default function SettingsPage() {
               rel="noopener noreferrer"
               className="text-xs text-blue-400 hover:text-white flex items-center gap-1 font-medium shrink-0"
             >
-              Get Free Key <ExternalLink className="w-3 h-3" />
+              Get Free Key <ExternalLink className="w-3 h-3" aria-hidden="true" />
             </a>
           </div>
 
           <form onSubmit={handleSaveApiKey} className="flex gap-2">
-            <input
-              type="password"
-              value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-              placeholder="AIzaSy... (Optional override)"
-              className="input-field text-xs font-mono flex-1 bg-[#0b0f17]"
-            />
+            <div className="relative flex-1">
+              <input
+                id="gemini-api-key"
+                name="apiKey"
+                type={showApiKey ? 'text' : 'password'}
+                autoComplete="off"
+                spellCheck={false}
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="AIzaSy… (Optional override)"
+                className="input-field text-xs font-mono bg-[#0b0f17] pr-10"
+                aria-label="Google Gemini API Key"
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+              >
+                {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             <button
               type="submit"
               className="btn-primary text-xs py-2 px-4 shrink-0 font-semibold"
@@ -198,14 +217,14 @@ export default function SettingsPage() {
             </button>
           </form>
           <p className="text-[11px] font-mono text-slate-500">
-            Stored locally in your client environment. Zero server storage of client personal keys.
+            Stored locally in your client environment. Zero server storage of personal API keys.
           </p>
         </div>
 
         {/* 2. Mentor Persona */}
         <div className="p-5 sm:p-6 rounded-2xl bg-[#121824] border border-[#242f42] space-y-3.5">
           <div className="flex items-center gap-2.5">
-            <UserCircle className="w-4 h-4 text-blue-400" />
+            <UserCircle className="w-4 h-4 text-blue-400" aria-hidden="true" />
             <div>
               <h2 className="text-sm font-bold text-white">Default Mentor Persona</h2>
               <p className="text-xs text-slate-400">
@@ -214,21 +233,23 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5" role="radiogroup" aria-label="Default Mentor Persona">
             {MENTOR_PERSONAS.map((p) => {
               const isSelected = settings?.mentor_persona === p.value;
               return (
                 <button
                   key={p.value}
                   type="button"
+                  role="radio"
+                  aria-checked={isSelected}
                   onClick={() => handlePersonaChange(p.value)}
-                  className={`p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                  className={`p-3.5 rounded-xl border text-left transition-colors flex items-center gap-3 ${
                     isSelected
-                      ? 'bg-blue-600/10 border-blue-500 text-white'
+                      ? 'bg-blue-600/10 border-blue-500 text-white shadow-xs'
                       : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200 hover:border-[#3b4c68]'
                   }`}
                 >
-                  <span className="text-xl p-1 bg-[#161f2e] rounded-lg border border-[#242f42]">{p.emoji}</span>
+                  <span className="text-xl p-1 bg-[#161f2e] rounded-lg border border-[#242f42]" aria-hidden="true">{p.emoji}</span>
                   <div>
                     <p className="font-semibold text-xs text-white">{p.label}</p>
                     <p className="text-[10px] text-slate-500 capitalize font-mono">{p.value} mode</p>
@@ -243,7 +264,7 @@ export default function SettingsPage() {
         <div className="p-5 sm:p-6 rounded-2xl bg-[#121824] border border-[#242f42] space-y-3.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <Bell className="w-4 h-4 text-blue-400" />
+              <Bell className="w-4 h-4 text-blue-400" aria-hidden="true" />
               <div>
                 <h2 className="text-sm font-bold text-white">Milestone Push Notifications</h2>
                 <p className="text-xs text-slate-400">
@@ -251,16 +272,16 @@ export default function SettingsPage() {
                 </p>
               </div>
             </div>
-
             <button
               type="button"
               onClick={handleNotificationToggle}
-              className={`w-11 h-6 rounded-full p-0.5 transition-colors relative ${
-                settings?.push_enabled ? 'bg-blue-600' : 'bg-[#1e293b]'
+              className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
+                settings?.push_enabled ? 'bg-blue-600' : 'bg-[#1a2332] border border-[#242f42]'
               }`}
+              aria-label="Toggle push notifications"
             >
               <div
-                className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
                   settings?.push_enabled ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
@@ -268,20 +289,18 @@ export default function SettingsPage() {
           </div>
 
           {settings?.push_enabled && (
-            <div className="pt-3 border-t border-[#1e293b] space-y-2">
-              <label className="text-xs font-semibold text-slate-300 font-mono">
-                Notification Frequency
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {PACING_OPTIONS.slice(0, 3).map((opt) => (
+            <div className="pt-2 border-t border-[#1e293b] space-y-2">
+              <label className="text-xs font-mono uppercase text-slate-400">Notification Pacing Cadence</label>
+              <div className="grid grid-cols-3 gap-2">
+                {PACING_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => handlePacingChange(opt.value)}
-                    className={`p-2.5 rounded-lg border text-xs text-left transition-colors ${
+                    className={`py-2 px-3 rounded-lg border text-xs capitalize transition-colors ${
                       settings?.notification_pacing === opt.value
-                        ? 'bg-blue-600/10 border-blue-500 text-white font-medium'
-                        : 'bg-[#0e141f] border-[#242f42] text-slate-400'
+                        ? 'bg-blue-600/10 border-blue-500 text-white font-semibold'
+                        : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-white'
                     }`}
                   >
                     {opt.label}
@@ -292,96 +311,100 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* 4. Data Portability & Danger Zone */}
+        {/* 4. Data Export & Portability */}
         <div className="p-5 sm:p-6 rounded-2xl bg-[#121824] border border-[#242f42] space-y-3.5">
-          <div>
-            <h2 className="text-sm font-bold text-white">Data Portability &amp; Storage</h2>
-            <p className="text-xs text-slate-400">
-              Own your learning blueprints. Export your roadmaps and XP history, or purge local session cache.
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Download className="w-4 h-4 text-blue-400" aria-hidden="true" />
+              <div>
+                <h2 className="text-sm font-bold text-white">Complete Data Portability</h2>
+                <p className="text-xs text-slate-400">
+                  Export complete application state, user progress, roadmaps, and chat transcripts to JSON.
+                </p>
+              </div>
+            </div>
             <button
               type="button"
               onClick={handleExportAllData}
-              className="btn-secondary w-full sm:w-auto text-xs py-2 px-3.5 flex items-center justify-center gap-1.5"
+              className="btn-secondary text-xs py-2 px-3.5 inline-flex items-center gap-1.5"
             >
-              <Download className="w-3.5 h-3.5 text-slate-400" />
-              Export All Data (JSON)
-            </button>
-            <button
-              type="button"
-              onClick={wipeAllLocalData}
-              className="btn-secondary w-full sm:w-auto text-xs py-2 px-3.5 flex items-center justify-center gap-1.5"
-              title="Clears all local auth tokens and cached blueprints"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
-              Reset Local Session Cache
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDeleteConfirmationInput('');
-                setShowDeleteModal(true);
-              }}
-              className="w-full sm:w-auto text-xs py-2 px-3.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 flex items-center justify-center gap-1.5 transition-colors font-medium ml-auto"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-              Delete All Account Data
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              Export JSON Backup
             </button>
           </div>
         </div>
 
-        {/* Delete Modal */}
-        <Modal
-          isOpen={showDeleteModal}
-          onClose={() => setShowDeleteModal(false)}
-          title="Delete All Account Data"
-        >
-          <form onSubmit={handleConfirmWipe} className="space-y-4">
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+        {/* 5. Danger Zone */}
+        <div className="p-5 sm:p-6 rounded-2xl bg-rose-950/10 border border-rose-500/20 space-y-3.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Trash2 className="w-4 h-4 text-rose-400" aria-hidden="true" />
               <div>
-                <p className="font-bold">Irreversible Action</p>
-                <p className="mt-0.5 text-slate-300">
-                  All created blueprints, completed deliverable checkmarks, XP stats, and conversation turns will be permanently deleted.
+                <h2 className="text-sm font-bold text-rose-300">Wipe All Account Data</h2>
+                <p className="text-xs text-slate-400">
+                  Permanently erase all generated blueprints, milestone logs, chat conversations, and earned XP.
                 </p>
               </div>
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Type <strong className="text-rose-400 font-mono">DELETE</strong> to confirm:
-              </label>
-              <input
-                type="text"
-                value={deleteConfirmationInput}
-                onChange={(e) => setDeleteConfirmationInput(e.target.value)}
-                placeholder="DELETE"
-                className="input-field text-xs font-mono"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(false)}
-                className="btn-secondary text-xs py-2 px-4"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={deleteConfirmationInput !== 'DELETE' || isWiping}
-                className="text-xs py-2 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold disabled:opacity-40 transition-colors"
-              >
-                {isWiping ? 'Wiping...' : 'Permanently Delete'}
-              </button>
-            </div>
-          </form>
-        </Modal>
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(true)}
+              className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-colors shrink-0"
+            >
+              Erase Data
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Confirm Data Destruction"
+      >
+        <form onSubmit={handleConfirmWipe} className="space-y-4">
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
+            <span>This action cannot be undone. All milestones, chat histories, and progress will be erased permanently.</span>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="confirm-delete-input" className="text-xs text-slate-300 block">
+              Type <strong className="text-rose-400 font-mono">DELETE</strong> to authorize data wipe:
+            </label>
+            <input
+              id="confirm-delete-input"
+              name="confirmDelete"
+              type="text"
+              autoComplete="off"
+              spellCheck={false}
+              value={deleteConfirmationInput}
+              onChange={(e) => setDeleteConfirmationInput(e.target.value)}
+              placeholder="DELETE"
+              className="input-field text-xs font-mono bg-[#0b0f17]"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(false)}
+              className="btn-secondary text-xs py-2 px-4"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={deleteConfirmationInput !== 'DELETE' || isWiping}
+              className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-semibold text-xs transition-colors"
+            >
+              {isWiping ? 'Erasing…' : 'Confirm Erase'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </Layout>
   );
 }

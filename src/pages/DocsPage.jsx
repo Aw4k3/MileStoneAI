@@ -523,7 +523,7 @@ const TECH_ENDPOINTS = [
       ],
       message: 'Where should I start practice problems for this?',
     },
-    response: 'data: {"chunk": "Start with "}\ndata: {"chunk": "Khan Academy\'s Multivariable Calculus section..."}\ndata: [DONE]',
+    response: 'data: {"chunk": "Start with "}\ndata: {"chunk": "Khan Academy\'s Multivariable Calculus section…"}\ndata: [DONE]',
     curl: `curl -N -X POST https://pgoeqctzvbzwhafcrcvq.supabase.co/functions/v1/chat-mentor \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -671,52 +671,64 @@ export default function DocsPage() {
           </div>
 
           {/* Tab Switcher */}
-          <div className="flex items-center p-1 rounded-lg bg-[#0e141f] border border-[#1e293b] text-xs font-mono">
+          <div className="flex items-center p-1 rounded-lg bg-[#0e141f] border border-[#1e293b] text-xs font-mono" role="tablist">
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'pitch'}
               onClick={() => setActiveTab('pitch')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${
                 activeTab === 'pitch'
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Presentation className="w-3.5 h-3.5" />
+              <Presentation className="w-3.5 h-3.5" aria-hidden="true" />
               <span className="hidden sm:inline">YC Pitch Deck</span>
               <span className="sm:hidden">Deck</span>
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'technical'}
               onClick={() => setActiveTab('technical')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${
                 activeTab === 'technical'
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Terminal className="w-3.5 h-3.5" />
+              <Terminal className="w-3.5 h-3.5" aria-hidden="true" />
               <span className="hidden sm:inline">Technical Spec</span>
               <span className="sm:hidden">Tech</span>
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'telemetry'}
               onClick={() => setActiveTab('telemetry')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${
                 activeTab === 'telemetry'
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Activity className="w-3.5 h-3.5" />
+              <Activity className="w-3.5 h-3.5" aria-hidden="true" />
               <span className="hidden sm:inline">Live Telemetry</span>
               <span className="sm:hidden">Status</span>
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'team'}
               onClick={() => setActiveTab('team')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${
                 activeTab === 'team'
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Users className="w-3.5 h-3.5" />
+              <Users className="w-3.5 h-3.5" aria-hidden="true" />
               <span className="hidden sm:inline">Team</span>
             </button>
           </div>
@@ -770,16 +782,20 @@ export default function DocsPage() {
                 </button>
 
                 {/* Slide indicator dots */}
-                <div className="hidden sm:flex items-center gap-1">
+                <div className="hidden sm:flex items-center gap-1" role="tablist" aria-label="Pitch deck slides">
                   {PITCH_SLIDES.map((_, idx) => (
                     <button
                       key={idx}
+                      type="button"
+                      role="tab"
+                      aria-selected={idx === currentSlideIndex}
                       onClick={() => setCurrentSlideIndex(idx)}
-                      className={`h-2 rounded-full transition-all ${
+                      className={`h-2 rounded-full transition-colors ${
                         idx === currentSlideIndex
                           ? 'w-6 bg-indigo-500'
                           : 'w-2 bg-slate-700 hover:bg-slate-500'
                       }`}
+                      aria-label={`Go to slide ${idx + 1}`}
                       title={`Go to slide ${idx + 1}`}
                     />
                   ))}
@@ -830,7 +846,7 @@ export default function DocsPage() {
 
                   {currentSlide.stat && (
                     <div className="text-right">
-                      <span className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-emerald-400">
+                      <span className="text-3xl sm:text-4xl font-extrabold text-white font-mono tnum">
                         {currentSlide.stat}
                       </span>
                       <p className="text-[11px] text-slate-400 font-medium">{currentSlide.statLabel}</p>
@@ -1114,8 +1130,8 @@ export default function DocsPage() {
                   disabled={isPinging}
                   className="btn-primary py-2 px-4 text-xs flex items-center gap-1.5"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isPinging ? 'animate-spin' : ''}`} />
-                  {isPinging ? 'Pinging Edge...' : 'Execute Live Health Probe'}
+                  <RefreshCw className={`w-3.5 h-3.5 ${isPinging ? 'animate-spin' : ''}`} aria-hidden="true" />
+                  {isPinging ? 'Pinging Edge…' : 'Execute Live Health Probe'}
                 </button>
               </div>
 

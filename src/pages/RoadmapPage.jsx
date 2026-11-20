@@ -20,6 +20,7 @@ import {
   Code,
   Brain,
   Layers,
+  Check,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import ProgressRing from '../components/common/ProgressRing';
@@ -67,7 +68,7 @@ export default function RoadmapPage() {
       <Layout>
         <div className="py-24 flex flex-col items-center justify-center space-y-3">
           <Spinner size="lg" />
-          <p className="text-xs text-slate-400 font-mono">Loading curriculum specification...</p>
+          <p className="text-xs text-slate-400 font-mono">Loading curriculum specification…</p>
         </div>
       </Layout>
     );
@@ -219,7 +220,7 @@ export default function RoadmapPage() {
               className="p-3.5 rounded-xl bg-blue-950/40 border border-blue-500/40 text-blue-200 text-xs flex items-center justify-between shadow-lg"
             >
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-blue-400" />
+                <Sparkles className="w-4 h-4 text-blue-400" aria-hidden="true" />
                 <span>{rebalanceToast}</span>
               </div>
               <button
@@ -236,7 +237,7 @@ export default function RoadmapPage() {
         <div className="p-5 sm:p-7 rounded-2xl bg-[#121824] border border-[#242f42] space-y-5">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
             <div className="space-y-2.5 max-w-2xl">
-              <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+              <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] tnum">
                 <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold uppercase">
                   {roadmap.difficulty}
                 </span>
@@ -252,7 +253,7 @@ export default function RoadmapPage() {
                 {roadmap.title}
               </h1>
 
-              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
                 {roadmap.goal_summary}
               </p>
             </div>
@@ -261,8 +262,8 @@ export default function RoadmapPage() {
             <div className="flex items-center gap-3.5 p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] shrink-0 self-start">
               <ProgressRing progress={progressPercent} size={64} strokeWidth={5} />
               <div className="text-left font-mono">
-                <span className="text-[11px] text-slate-500 block uppercase">Progress</span>
-                <p className="text-lg font-bold text-white">
+                <span className="text-[11px] text-slate-400 block uppercase">Progress</span>
+                <p className="text-lg font-bold text-white tnum">
                   {completedCount}<span className="text-xs text-slate-500 font-normal">/{milestones.length}</span>
                 </p>
                 <span className="text-[10px] text-emerald-400 font-medium">completed</span>
@@ -278,7 +279,7 @@ export default function RoadmapPage() {
                 onClick={() => setShowOutcomesModal(true)}
                 className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
               >
-                <Target className="w-3.5 h-3.5 text-blue-400" />
+                <Target className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
                 Key Target Outcomes
               </button>
 
@@ -289,8 +290,8 @@ export default function RoadmapPage() {
                 className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 disabled:opacity-50"
                 title="Redistribute remaining milestones evenly without losing progress"
               >
-                <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isRebalancing ? 'animate-spin' : ''}`} />
-                {isRebalancing ? 'Adapting...' : 'Adaptive Rebalance'}
+                <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isRebalancing ? 'animate-spin' : ''}`} aria-hidden="true" />
+                {isRebalancing ? 'Adapting…' : 'Adaptive Rebalance'}
               </button>
 
               <button
@@ -299,7 +300,7 @@ export default function RoadmapPage() {
                 className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
                 title="Export complete roadmap to Markdown document"
               >
-                <Download className="w-3.5 h-3.5 text-slate-400" />
+                <Download className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
                 Export .md
               </button>
 
@@ -309,7 +310,7 @@ export default function RoadmapPage() {
                 className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
                 title="Sync calendar with due dates"
               >
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <Calendar className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
                 Sync .ics
               </button>
             </div>
@@ -318,7 +319,7 @@ export default function RoadmapPage() {
               to={`/roadmap/${roadmap.id}/chat`}
               className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-2 font-semibold"
             >
-              <MessageSquare className="w-3.5 h-3.5" />
+              <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" />
               Chat with Mentor
             </Link>
           </div>
@@ -328,7 +329,7 @@ export default function RoadmapPage() {
         <div className="space-y-3.5">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-blue-400" />
+              <Layers className="w-4 h-4 text-blue-400" aria-hidden="true" />
               Curriculum Milestones
             </h2>
             <span className="text-xs font-mono text-slate-400">
@@ -345,7 +346,7 @@ export default function RoadmapPage() {
               return (
                 <div
                   key={m.id}
-                  className={`rounded-2xl border transition-all duration-150 overflow-hidden ${
+                  className={`rounded-2xl border transition-colors duration-150 overflow-hidden ${
                     m.is_completed
                       ? 'bg-[#0d131d] border-[#1a2332]'
                       : 'bg-[#121824] border-[#242f42] hover:border-[#3b4c68]'
@@ -353,7 +354,16 @@ export default function RoadmapPage() {
                 >
                   {/* Milestone Card Header */}
                   <div
-                    className="p-4 sm:p-5 flex items-start gap-3.5 cursor-pointer select-none"
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setExpandedId(isExpanded ? null : m.id);
+                      }
+                    }}
+                    className="p-4 sm:p-5 flex items-start gap-3.5 cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-2xl"
                     onClick={() => setExpandedId(isExpanded ? null : m.id)}
                   >
                     <button
@@ -362,28 +372,28 @@ export default function RoadmapPage() {
                         e.stopPropagation();
                         handleMilestoneToggle(m);
                       }}
-                      className="mt-0.5 text-slate-500 hover:text-blue-400 transition-colors"
-                      aria-label="Toggle milestone completion"
+                      className="mt-0.5 text-slate-500 hover:text-blue-400 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+                      aria-label={m.is_completed ? 'Mark milestone incomplete' : 'Mark milestone complete'}
                     >
                       {m.is_completed ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-400/10" />
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-400/10" aria-hidden="true" />
                       ) : (
-                        <Circle className="w-5 h-5" />
+                        <Circle className="w-5 h-5" aria-hidden="true" />
                       )}
                     </button>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2 mb-1 font-mono text-xs">
-                        <span className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
+                        <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold tnum">
                           Milestone {String(idx + 1).padStart(2, '0')}
                         </span>
                         {m.is_major && (
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
-                            <Brain className="w-3 h-3" />
+                            <Brain className="w-3 h-3" aria-hidden="true" />
                             Gated Quiz
                           </span>
                         )}
-                        <span className="text-[11px] text-blue-400 ml-auto">
+                        <span className="text-[11px] text-blue-400 ml-auto tnum font-semibold">
                           +{m.xp_reward} XP
                         </span>
                       </div>
@@ -396,7 +406,7 @@ export default function RoadmapPage() {
                         {m.title}
                       </h3>
 
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-1 font-mono text-[11px]">
+                      <p className="text-xs text-slate-400 mt-1 line-clamp-1 font-mono text-[11px] tnum">
                         {completedDeliverables} of {deliverables.length} deliverables complete
                       </p>
                     </div>
@@ -404,8 +414,9 @@ export default function RoadmapPage() {
                     <button
                       type="button"
                       className="p-1 rounded text-slate-400 hover:text-white"
+                      aria-label={isExpanded ? 'Collapse milestone details' : 'Expand milestone details'}
                     >
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      {isExpanded ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
                     </button>
                   </div>
 
@@ -432,9 +443,12 @@ export default function RoadmapPage() {
                             {deliverables.map((del) => (
                               <label
                                 key={del.id}
+                                htmlFor={`del-${del.id}`}
                                 className="flex items-start gap-2.5 p-2 rounded-lg bg-[#0e141f] border border-[#1e293b] hover:border-[#2d3a4e] cursor-pointer text-xs transition-colors"
                               >
                                 <input
+                                  id={`del-${del.id}`}
+                                  name={`del-${del.id}`}
                                   type="checkbox"
                                   checked={del.is_completed}
                                   onChange={() => toggleDeliverable(m.id, del.id, del.is_completed)}
@@ -466,12 +480,12 @@ export default function RoadmapPage() {
                                     className="p-2.5 rounded-lg bg-[#0e141f] border border-[#1e293b] hover:border-blue-500/40 text-xs flex items-center justify-between gap-2 group transition-colors"
                                   >
                                     <div className="flex items-center gap-2 min-w-0">
-                                      <Icon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                      <Icon className="w-3.5 h-3.5 text-blue-400 shrink-0" aria-hidden="true" />
                                       <span className="text-slate-300 group-hover:text-white truncate">
                                         {res.title}
                                       </span>
                                     </div>
-                                    <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-blue-400 shrink-0" />
+                                    <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-blue-400 shrink-0" aria-hidden="true" />
                                   </a>
                                 );
                               })}
@@ -495,7 +509,7 @@ export default function RoadmapPage() {
         title="Key Target Outcomes"
       >
         <div className="space-y-3">
-          <p className="text-xs text-slate-400 leading-relaxed">
+          <p className="text-xs text-slate-300 leading-relaxed">
             By completing this blueprint, you will master and independently verify the following capabilities:
           </p>
           <div className="space-y-2">
@@ -504,7 +518,7 @@ export default function RoadmapPage() {
                 key={idx}
                 className="flex items-start gap-2.5 p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] text-xs text-slate-200"
               >
-                <Target className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                <Target className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" aria-hidden="true" />
                 <span>{outcome}</span>
               </div>
             ))}
@@ -529,16 +543,16 @@ export default function RoadmapPage() {
         {quizLoading ? (
           <div className="py-10 text-center space-y-3">
             <Spinner size="md" />
-            <p className="text-xs text-slate-400 font-mono">Synthesizing verification scenario questions...</p>
+            <p className="text-xs text-slate-400 font-mono">Synthesizing verification scenario questions…</p>
           </div>
         ) : (
           <form onSubmit={handleQuizSubmit} className="space-y-4">
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-300">
               Answer these short conceptual scenarios to certify mastery of <strong>{pendingQuizMilestone?.title}</strong> and earn bonus XP!
             </p>
 
             {quizError && (
-              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs" role="alert" aria-live="polite">
                 {quizError}
               </div>
             )}
@@ -551,8 +565,9 @@ export default function RoadmapPage() {
                   </p>
                   <div className="space-y-1.5 pl-1">
                     {(q.options || []).map((opt, oIdx) => (
-                      <label key={oIdx} className="flex items-center gap-2 cursor-pointer hover:text-white">
+                      <label key={oIdx} htmlFor={`quiz-q-${qIdx}-opt-${oIdx}`} className="flex items-center gap-2 cursor-pointer hover:text-white">
                         <input
+                          id={`quiz-q-${qIdx}-opt-${oIdx}`}
                           type="radio"
                           name={`quiz-q-${qIdx}`}
                           value={opt}
