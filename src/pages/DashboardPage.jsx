@@ -61,15 +61,21 @@ export default function DashboardPage() {
   return (
     <Layout>
       <div className="space-y-8">
-        {/* Supabase Connection Banner (Shows if running on mock fallback or connected) */}
-        {!isSupabaseConnected && (
-          <div className="p-3 sm:p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 shrink-0" />
+        {/* Guest Mode Cloud Sync Banner */}
+        {!user && (
+          <div className="p-3 sm:p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
               <span>
-                <strong>Local Mock Mode:</strong> Supabase credentials not set in <code className="text-amber-200">.env.local</code>. Using sample data. Add your Supabase keys to enable live cloud persistence!
+                <strong>Browsing as Guest:</strong> Your blueprints are saved locally. Sign in to sync across devices and access cloud persistence.
               </span>
             </div>
+            <Link
+              to="/auth"
+              className="text-xs font-bold text-indigo-400 hover:text-white underline shrink-0 ml-3"
+            >
+              Sign In / Up →
+            </Link>
           </div>
         )}
 

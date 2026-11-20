@@ -15,42 +15,48 @@ export function AuthProvider({ children }) {
     let mounted = true;
 
     async function initAuth() {
-      if (!isSupabaseConfigured) {
-        // Fallback gracefully to mock user when Supabase env vars are pending
-        if (mounted) {
-          setUser(MOCK_USER);
-          setLoading(false);
-        }
-        return;
-      }
-
       try {
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
-        if (error) throw error;
+        if (error) {
+          console.warn('Supabase getSession notice:', error.message);
+        }
 
         if (mounted) {
           setSession(initialSession);
           if (initialSession?.user) {
-            // Fetch profile
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', initialSession.user.id)
-              .single();
+            let displayName =
+              initialSession.user.user_metadata?.full_name ||
+              initialSession.user.email?.split('@')[0] ||
+              'Adventurer';
+            let avatarUrl = initialSession.user.user_metadata?.avatar_url || null;
+
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('display_name, avatar_url')
+                .eq('id', initialSession.user.id)
+                .maybeSingle();
+
+              if (profile?.display_name) displayName = profile.display_name;
+              if (profile?.avatar_url) avatarUrl = profile.avatar_url;
+            } catch {
+              // Non-fatal if table permissions are still propagating
+            }
 
             setUser({
               id: initialSession.user.id,
               email: initialSession.user.email,
-              display_name: profile?.display_name || initialSession.user.user_metadata?.full_name || 'Adventurer',
-              avatar_url: profile?.avatar_url || null,
+              display_name: displayName,
+              avatar_url: avatarUrl,
             });
           } else {
+            // No active session — keep user null so login button / guest state works
             setUser(null);
           }
         }
       } catch (err) {
-        console.warn('Auth initialization fallback:', err.message);
-        if (mounted) setUser(MOCK_USER);
+        console.warn('Auth initialization notice:', err.message);
+        if (mounted) setUser(null);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -59,33 +65,42 @@ export function AuthProvider({ children }) {
     initAuth();
 
     // Listen for auth state changes
-    let subscription = null;
-    if (isSupabaseConfigured) {
-      const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-        setSession(newSession);
-        if (newSession?.user) {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      setSession(newSession);
+      if (newSession?.user) {
+        let displayName =
+          newSession.user.user_metadata?.full_name ||
+          newSession.user.email?.split('@')[0] ||
+          'Adventurer';
+        let avatarUrl = newSession.user.user_metadata?.avatar_url || null;
+
+        try {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('*')
+            .select('display_name, avatar_url')
             .eq('id', newSession.user.id)
-            .single();
+            .maybeSingle();
 
-          setUser({
-            id: newSession.user.id,
-            email: newSession.user.email,
-            display_name: profile?.display_name || newSession.user.user_metadata?.full_name || 'Adventurer',
-            avatar_url: profile?.avatar_url || null,
-          });
-        } else {
-          setUser(null);
+          if (profile?.display_name) displayName = profile.display_name;
+          if (profile?.avatar_url) avatarUrl = profile.avatar_url;
+        } catch {
+          // Non-fatal
         }
-      });
-      subscription = data?.subscription;
-    }
+
+        setUser({
+          id: newSession.user.id,
+          email: newSession.user.email,
+          display_name: displayName,
+          avatar_url: avatarUrl,
+        });
+      } else {
+        setUser(null);
+      }
+    });
 
     return () => {
       mounted = false;
-      if (subscription) subscription.unsubscribe();
+      authListener?.subscription?.unsubscribe();
     };
   }, []);
 
@@ -93,19 +108,37 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     setLoading(true);
     try {
-      if (!isSupabaseConfigured) {
-        await new Promise((res) => setTimeout(res, 500));
-        const mockLogged = { ...MOCK_USER, email };
-        setUser(mockLogged);
-        return mockLogged;
-      }
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
+
+      if (data?.user) {
+        const displayName =
+          data.user.user_metadata?.full_name ||
+          data.user.email?.split('@')[0] ||
+          'Adventurer';
+
+        setUser({
+          id: data.user.id,
+          email: data.user.email,
+          display_name: displayName,
+          avatar_url: null,
+        });
+
+        // Ensure user profile exists
+        try {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            display_name: displayName,
+          });
+        } catch {
+          // Ignore
+        }
+      }
+
       return data.user;
     } finally {
       setLoading(false);
@@ -116,13 +149,6 @@ export function AuthProvider({ children }) {
   const signup = useCallback(async (email, password, displayName) => {
     setLoading(true);
     try {
-      if (!isSupabaseConfigured) {
-        await new Promise((res) => setTimeout(res, 500));
-        const mockNew = { ...MOCK_USER, email, display_name: displayName };
-        setUser(mockNew);
-        return mockNew;
-      }
-
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -134,6 +160,26 @@ export function AuthProvider({ children }) {
       });
 
       if (error) throw error;
+
+      if (data?.user) {
+        setUser({
+          id: data.user.id,
+          email: data.user.email,
+          display_name: displayName || data.user.email?.split('@')[0] || 'Adventurer',
+          avatar_url: null,
+        });
+
+        // Ensure user profile exists
+        try {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            display_name: displayName || data.user.email?.split('@')[0] || 'Adventurer',
+          });
+        } catch {
+          // Ignore
+        }
+      }
+
       return data.user;
     } finally {
       setLoading(false);
@@ -144,12 +190,6 @@ export function AuthProvider({ children }) {
   const loginWithGoogle = useCallback(async () => {
     setLoading(true);
     try {
-      if (!isSupabaseConfigured) {
-        await new Promise((res) => setTimeout(res, 600));
-        setUser(MOCK_USER);
-        return MOCK_USER;
-      }
-
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -168,9 +208,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     setLoading(true);
     try {
-      if (isSupabaseConfigured) {
-        await supabase.auth.signOut();
-      }
+      await supabase.auth.signOut();
       setUser(null);
       setSession(null);
     } finally {

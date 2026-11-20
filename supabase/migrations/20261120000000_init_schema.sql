@@ -333,3 +333,16 @@ CREATE POLICY "Users can insert own chat messages"
 CREATE POLICY "Users can delete own chat messages"
   ON public.chat_messages FOR DELETE
   USING (auth.uid() = user_id);
+
+-- ==============================================================================
+-- 9. SCHEMA PERMISSIONS (Grant table access to anon and authenticated roles)
+-- ==============================================================================
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+
