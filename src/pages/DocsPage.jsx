@@ -644,40 +644,40 @@ export default function DocsPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="min-h-screen flex flex-col bg-[#0b0f17] text-slate-100">
       {/* Top Universal Docs Header */}
-      <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80">
+      <header className="sticky top-0 z-40 bg-[#0b0f17]/95 backdrop-blur-md border-b border-[#1e293b]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Brand */}
           <div className="flex items-center gap-3">
             <Link
               to="/dashboard"
-              className="flex items-center gap-2 group transition-transform active:scale-95"
+              className="flex items-center gap-2.5 group"
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center shadow-md shadow-indigo-500/20">
-                <Rocket className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold transition-transform group-hover:scale-105">
+                <Rocket className="w-4 h-4" />
               </div>
               <div className="flex items-center gap-1.5 font-bold tracking-tight text-sm sm:text-base">
-                <span>Milestone <span className="text-gradient">AI</span></span>
-                <span className="text-xs px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 font-mono border border-indigo-500/20">/docs</span>
+                <span>Milestone <span className="text-white">AI</span></span>
+                <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono border border-blue-500/20">/docs</span>
               </div>
             </Link>
 
             {/* Publishing Status Pill */}
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>LIVE • YC SPEC v1.2</span>
             </div>
           </div>
 
           {/* Tab Switcher */}
-          <div className="flex items-center p-1 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+          <div className="flex items-center p-1 rounded-lg bg-[#0e141f] border border-[#1e293b] text-xs font-mono">
             <button
               onClick={() => setActiveTab('pitch')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
                 activeTab === 'pitch'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               <Presentation className="w-3.5 h-3.5" />
@@ -686,10 +686,10 @@ export default function DocsPage() {
             </button>
             <button
               onClick={() => setActiveTab('technical')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
                 activeTab === 'technical'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               <Terminal className="w-3.5 h-3.5" />
@@ -698,10 +698,10 @@ export default function DocsPage() {
             </button>
             <button
               onClick={() => setActiveTab('telemetry')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
                 activeTab === 'telemetry'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               <Activity className="w-3.5 h-3.5" />
@@ -710,10 +710,10 @@ export default function DocsPage() {
             </button>
             <button
               onClick={() => setActiveTab('team')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
                 activeTab === 'team'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               <Users className="w-3.5 h-3.5" />
@@ -725,7 +725,7 @@ export default function DocsPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowAdminModal(true)}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#121824] border border-[#242f42] transition-colors"
               title="Access & Publishing Settings"
             >
               <Shield className="w-4 h-4" />

@@ -3,20 +3,17 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles,
   ArrowRight,
   ArrowLeft,
   Target,
   Sliders,
   CheckCircle2,
   AlertTriangle,
-  Zap,
-  BookOpen,
   Layers,
   Wand2,
   Check,
   Calendar,
-  Clock,
+  Sparkles,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Spinner from '../components/common/Spinner';
@@ -38,7 +35,6 @@ export default function WizardPage() {
   const navigate = useNavigate();
   const { createRoadmap } = useRoadmaps();
 
-  // Wizard Step: 0 = Goal & Formal Titles, 1 = Timeline, Pacing & Blueprint Parameters
   const [step, setStep] = useState(0);
 
   // Form State
@@ -62,7 +58,6 @@ export default function WizardPage() {
   const [generationStepText, setGenerationStepText] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Handle template selection
   const handleSelectTemplate = (template) => {
     setGoal(template.goal);
     setSelectedTitle(template.title);
@@ -71,7 +66,6 @@ export default function WizardPage() {
     setSuggestedTitles([]);
   };
 
-  // Run AI Formal Course Title Generator
   const handleSuggestTitles = async () => {
     if (!goal.trim()) return;
     setIsSuggestingTitles(true);
@@ -82,13 +76,12 @@ export default function WizardPage() {
         setSuggestedTitles(res.titles);
       }
     } catch (err) {
-      console.warn('AI formal title suggestion notice:', err.message);
+      console.warn('Title suggestion notice:', err.message);
     } finally {
       setIsSuggestingTitles(false);
     }
   };
 
-  // Run AI Duration & Pacing Estimation
   const handleEstimateDuration = async () => {
     if (!goal.trim()) return;
     setIsEstimatingDuration(true);
@@ -98,13 +91,12 @@ export default function WizardPage() {
         setAiDurationSuggestion(res);
       }
     } catch (err) {
-      console.warn('AI duration estimator notice:', err.message);
+      console.warn('Duration estimation notice:', err.message);
     } finally {
       setIsEstimatingDuration(false);
     }
   };
 
-  // Apply AI Duration, Pacing & Milestone Count Recommendation
   const applyAiRecommendation = () => {
     if (!aiDurationSuggestion) return;
     if (aiDurationSuggestion.recommended_months) {
@@ -118,7 +110,6 @@ export default function WizardPage() {
     }
   };
 
-  // Proceed to Step 1 and trigger AI timeline calibration
   const handleContinueToStep1 = () => {
     setStep(1);
     if (!aiDurationSuggestion) {
@@ -126,10 +117,8 @@ export default function WizardPage() {
     }
   };
 
-  // Overload guardrail: block Daily pacing on plans > 6 months
   const isOverloadBlocked = pacing === 'daily' && durationMonths > 6;
 
-  // Generate complete roadmap with Gemini AI
   const handleGenerate = async () => {
     setIsGenerating(true);
     setErrorMessage('');
@@ -138,7 +127,6 @@ export default function WizardPage() {
     let generatedRoadmapId = null;
 
     try {
-      // 1. Live Gemini AI Synthesis via Supabase Proxy (or fallback engine)
       const aiData = await generateRoadmapWithAI({
         goal,
         difficulty,
@@ -149,7 +137,6 @@ export default function WizardPage() {
 
       setGenerationStepText(`Generated ${aiData?.milestones?.length || targetMilestones} comprehensive milestones with verified resources...`);
 
-      // 2. Persist using createRoadmap (Hybrid: Supabase + LocalStorage)
       const finalTitle = selectedTitle || aiData?.title || (goal.length > 50 ? `${goal.slice(0, 48)}...` : goal);
 
       const created = await createRoadmap({
@@ -175,7 +162,6 @@ export default function WizardPage() {
       }, 400);
     } catch (err) {
       console.error('Roadmap synthesis error:', err);
-      // Emergency local fallback to ensure user is never blocked
       try {
         const fallback = await createRoadmap({
           title: selectedTitle || (goal.length > 50 ? `${goal.slice(0, 48)}...` : goal),
@@ -212,23 +198,31 @@ export default function WizardPage() {
   return (
     <Layout>
       <div className="max-w-3xl mx-auto py-2">
-        {/* Wizard Progress Bar */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 mb-2">
-            <span>Step {step + 1} of 2</span>
-            <span>
-              {step === 0 && 'Define Course Objective & AI Title'}
-              {step === 1 && 'Timeline, Pacing & Milestone Architecture'}
+        {/* Step Indicator Header */}
+        <div className="mb-6 pb-4 border-b border-[#1e293b] flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <span className={`font-mono font-bold px-2 py-0.5 rounded text-[11px] ${
+              step === 0 ? 'bg-blue-600 text-white' : 'bg-[#1a2332] text-slate-400'
+            }`}>
+              01
+            </span>
+            <span className={step === 0 ? 'text-white font-semibold' : 'text-slate-400'}>
+              Objective &amp; Title
+            </span>
+            <span className="text-slate-600">/</span>
+            <span className={`font-mono font-bold px-2 py-0.5 rounded text-[11px] ${
+              step === 1 ? 'bg-blue-600 text-white' : 'bg-[#1a2332] text-slate-400'
+            }`}>
+              02
+            </span>
+            <span className={step === 1 ? 'text-white font-semibold' : 'text-slate-400'}>
+              Timeline &amp; Pacing
             </span>
           </div>
-          <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-indigo-500 rounded-full"
-              initial={{ width: '50%' }}
-              animate={{ width: step === 0 ? '50%' : '100%' }}
-              transition={{ duration: 0.3 }}
-            />
-          </div>
+
+          <span className="font-mono text-slate-400 hidden sm:inline">
+            Step {step + 1} of 2
+          </span>
         </div>
 
         {errorMessage && (
@@ -237,26 +231,26 @@ export default function WizardPage() {
           </div>
         )}
 
-        {/* Wizard Steps Form */}
-        <div className="card p-6 sm:p-8 relative">
+        {/* Wizard Card */}
+        <div className="p-6 sm:p-8 rounded-2xl bg-[#121824] border border-[#242f42] relative">
           <AnimatePresence mode="wait">
-            {/* STEP 0: Goal Input & AI Formal Course Title Generator */}
+            {/* STEP 0: Goal Input & Title Suggestions */}
             {step === 0 && (
               <motion.div
                 key="step-0"
-                initial={{ opacity: 0, x: 12 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
                 className="space-y-6"
               >
                 <div>
-                  <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-                    <Target className="w-5 h-5 text-indigo-400" />
-                    What do you want to learn or build?
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Target className="w-5 h-5 text-blue-400" />
+                    What do you want to master or build?
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                    Describe your objective in natural language. Our Gemini engine will analyze
-                    scope, pre-requisites, and synthesize production-grade milestones.
+                    Describe your end goal in natural language. Gemini will analyze prerequisites and build a sequential milestone path.
                   </p>
                 </div>
 
@@ -270,98 +264,76 @@ export default function WizardPage() {
                         setSelectedTitle('');
                       }
                     }}
-                    placeholder="e.g. Master full-stack AI SaaS engineering with Next.js, Stripe subscriptions, and LangChain to build scalable web products..."
-                    className="input-field resize-none text-sm leading-relaxed"
+                    placeholder="e.g. Master Full-Stack AI SaaS engineering with Next.js, Stripe subscriptions, and PostgreSQL to ship production software..."
+                    className="input-field resize-none text-xs sm:text-sm leading-relaxed"
                   />
                   <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-slate-400">
-                    <span>Be specific about your end deliverable or domain</span>
+                    <span className="text-[11px] text-slate-500">Be concrete about your technology stack or target deliverables</span>
                     <button
                       type="button"
                       onClick={handleSuggestTitles}
                       disabled={!goal.trim() || isSuggestingTitles}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 text-xs font-medium transition-colors disabled:opacity-50"
+                      className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-40 flex items-center gap-1.5 font-medium transition-colors"
                     >
-                      {isSuggestingTitles ? (
-                        <>
-                          <Spinner size="xs" />
-                          <span>Generating Formal Titles...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>Suggest Formal Titles with AI</span>
-                        </>
-                      )}
+                      <Wand2 className={`w-3.5 h-3.5 ${isSuggestingTitles ? 'animate-spin' : ''}`} />
+                      {isSuggestingTitles ? 'Generating Titles...' : 'Suggest Formal Titles'}
                     </button>
                   </div>
                 </div>
 
-                {/* AI Suggested Formal Course Titles */}
+                {/* AI Formal Title Suggestions */}
                 {suggestedTitles.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-4 rounded-xl bg-slate-800/40 border border-indigo-500/30 space-y-2.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                        AI Formal Course Titles (Click to select)
-                      </p>
-                      <span className="text-[10px] text-slate-400">Powered by Gemini</span>
-                    </div>
-                    <div className="space-y-2">
-                      {suggestedTitles.map((title, idx) => {
+                  <div className="p-4 rounded-xl bg-[#0e141f] border border-[#1e293b] space-y-2.5">
+                    <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block">
+                      AI Formal Title Suggestions (Click to Select)
+                    </span>
+                    <div className="flex flex-col gap-2">
+                      {suggestedTitles.map((title) => {
                         const isChosen = selectedTitle === title;
                         return (
                           <button
-                            key={idx}
+                            key={title}
                             type="button"
                             onClick={() => setSelectedTitle(title)}
-                            className={`w-full text-left p-3 rounded-lg border text-xs transition-all flex items-center justify-between gap-3 ${
+                            className={`p-2.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between gap-2 ${
                               isChosen
-                                ? 'bg-indigo-500/20 border-indigo-500 text-indigo-100 font-semibold'
-                                : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white'
+                                ? 'bg-blue-600/10 border-blue-500 text-white font-semibold'
+                                : 'bg-[#121824] border-[#242f42] text-slate-300 hover:border-[#3b4c68]'
                             }`}
                           >
-                            <span className="truncate">{title}</span>
-                            {isChosen ? (
-                              <Check className="w-4 h-4 text-indigo-400 shrink-0" />
-                            ) : (
-                              <span className="text-[10px] text-slate-500 shrink-0">Select</span>
-                            )}
+                            <span>{title}</span>
+                            {isChosen && <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
                           </button>
                         );
                       })}
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
-                {/* Quick Templates Section */}
+                {/* Curated Templates */}
                 <div className="space-y-3 pt-2">
-                  <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-                    Or pick a 1-click curated blueprint
-                  </p>
+                  <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block">
+                    Or Start from an Engineering Blueprint Template
+                  </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {ROADMAP_TEMPLATES.map((tmpl) => (
+                    {ROADMAP_TEMPLATES.slice(0, 4).map((tmpl) => (
                       <button
-                        key={tmpl.title}
+                        key={tmpl.id}
                         type="button"
                         onClick={() => handleSelectTemplate(tmpl)}
                         className={`text-left p-3.5 rounded-xl border text-xs transition-all flex items-start gap-3 ${
                           goal === tmpl.goal
-                            ? 'bg-indigo-500/10 border-indigo-500/40 text-slate-100'
-                            : 'bg-slate-800/40 border-slate-800 hover:border-slate-700 text-slate-300'
+                            ? 'bg-blue-600/10 border-blue-500 text-white'
+                            : 'bg-[#0e141f] border-[#242f42] hover:border-[#3b4c68] text-slate-300'
                         }`}
                       >
-                        <span className="text-2xl p-1 bg-slate-900 rounded-lg shrink-0">
+                        <span className="text-xl p-1 bg-[#161f2e] rounded-lg shrink-0 border border-[#242f42]">
                           {tmpl.icon}
                         </span>
                         <div className="min-w-0">
-                          <p className="font-semibold text-slate-100">{tmpl.title}</p>
-                          <p className="text-slate-400 line-clamp-1 mt-0.5">{tmpl.goal}</p>
-                          <span className="inline-block mt-1 text-[10px] text-indigo-400 font-medium">
+                          <p className="font-semibold text-white">{tmpl.title}</p>
+                          <p className="text-slate-400 line-clamp-1 mt-0.5 text-[11px]">{tmpl.goal}</p>
+                          <span className="inline-block mt-1 text-[10px] font-mono text-blue-400">
                             {tmpl.duration} mo · {tmpl.difficulty}
                           </span>
                         </div>
@@ -371,96 +343,96 @@ export default function WizardPage() {
                 </div>
 
                 {/* Next Button */}
-                <div className="flex justify-end pt-4 border-t border-slate-800">
+                <div className="flex justify-end pt-4 border-t border-[#1e293b]">
                   <button
                     type="button"
                     disabled={!goal.trim()}
                     onClick={handleContinueToStep1}
-                    className="btn-primary inline-flex items-center gap-2 text-sm py-2.5 px-5 disabled:opacity-50"
+                    className="btn-primary text-xs py-2.5 px-5"
                   >
-                    Continue to Timeline & Milestones
-                    <ArrowRight className="w-4 h-4" />
+                    Continue to Timeline &amp; Pacing
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </motion.div>
             )}
 
-            {/* STEP 1: Timeline, Pacing, Target Milestones & Blueprint Generation */}
+            {/* STEP 1: Timeline, Pacing, Target Milestones */}
             {step === 1 && (
               <motion.div
                 key="step-1"
-                initial={{ opacity: 0, x: 12 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
                 className="space-y-6"
               >
                 <div>
-                  <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-                    <Sliders className="w-5 h-5 text-indigo-400" />
-                    Timeline, Pacing & Milestone Architecture
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Sliders className="w-5 h-5 text-blue-400" />
+                    Timeline, Pacing &amp; Milestone Count
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                    Fine-tune course duration, milestone frequency, target milestone count, and AI reasoning depth.
+                    Calibrate the total duration, milestone count, and execution frequency for your curriculum.
                   </p>
                 </div>
 
-                {/* AI Duration & Pacing Recommendation Card */}
+                {/* AI Duration Recommendation */}
                 {aiDurationSuggestion ? (
-                  <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 space-y-2.5">
+                  <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-500/30 space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                        AI Recommendation for Your Goal
+                      <span className="text-xs font-semibold text-blue-300 flex items-center gap-1.5 font-mono">
+                        <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                        AI Timeline Calibration
                       </span>
                       <button
                         type="button"
                         onClick={applyAiRecommendation}
-                        className="px-2.5 py-1 rounded-md bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-[11px] transition-colors"
+                        className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[11px] transition-colors"
                       >
-                        Apply AI Recommendation
+                        Apply Recommendation
                       </button>
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed">
                       {aiDurationSuggestion.reasoning}
                     </p>
-                    <div className="flex flex-wrap gap-2 pt-1 text-[11px]">
-                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
-                        Duration: <strong className="text-indigo-400">{aiDurationSuggestion.recommended_months} months</strong>
+                    <div className="flex flex-wrap gap-2 pt-1 font-mono text-[11px]">
+                      <span className="px-2 py-0.5 rounded bg-[#0b0f17] border border-[#242f42] text-slate-300">
+                        Duration: <strong className="text-blue-400">{aiDurationSuggestion.recommended_months} mo</strong>
                       </span>
-                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
-                        Pacing: <strong className="text-indigo-400 capitalize">{aiDurationSuggestion.recommended_pacing || 'weekly'}</strong>
+                      <span className="px-2 py-0.5 rounded bg-[#0b0f17] border border-[#242f42] text-slate-300">
+                        Pacing: <strong className="text-blue-400 capitalize">{aiDurationSuggestion.recommended_pacing || 'weekly'}</strong>
                       </span>
-                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
-                        Milestones: <strong className="text-indigo-400">{aiDurationSuggestion.recommended_milestones || 8} milestones</strong>
+                      <span className="px-2 py-0.5 rounded bg-[#0b0f17] border border-[#242f42] text-slate-300">
+                        Milestones: <strong className="text-blue-400">{aiDurationSuggestion.recommended_milestones || 8}</strong>
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-800 text-xs">
-                    <span className="text-slate-400 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      Want AI to estimate optimal pacing and duration?
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] text-xs">
+                    <span className="text-slate-400 flex items-center gap-1.5 font-mono">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                      Auto-estimate timeline with Gemini
                     </span>
                     <button
                       type="button"
                       onClick={handleEstimateDuration}
                       disabled={isEstimatingDuration}
-                      className="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1"
+                      className="text-xs text-blue-400 hover:text-white font-medium"
                     >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      {isEstimatingDuration ? 'Analyzing Goal...' : 'Get AI Recommendation'}
+                      {isEstimatingDuration ? 'Analyzing Goal...' : 'Estimate Duration'}
                     </button>
                   </div>
                 )}
 
-                {/* Target Milestones Selector (Removes the artificial 6 milestone cap!) */}
+                {/* Target Milestones Selector */}
                 <div className="space-y-2.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-indigo-400" />
-                      Target Milestone Count
+                  <div className="flex justify-between items-center text-xs">
+                    <label className="font-semibold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-blue-400" />
+                      Milestone Count
                     </label>
-                    <span className="text-xs font-bold text-indigo-400">{targetMilestones} Milestones</span>
+                    <span className="font-mono font-bold text-blue-400">{targetMilestones} Milestones</span>
                   </div>
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                     {MILESTONE_COUNT_OPTIONS.map((count) => {
@@ -472,28 +444,26 @@ export default function WizardPage() {
                           onClick={() => setTargetMilestones(count)}
                           className={`p-2.5 rounded-xl border text-center transition-all ${
                             isSelected
-                              ? 'bg-indigo-500/20 border-indigo-500 text-indigo-200 font-bold'
-                              : 'bg-slate-800/40 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                              ? 'bg-blue-600/10 border-blue-500 text-white font-bold'
+                              : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200 hover:border-[#3b4c68]'
                           }`}
                         >
-                          <div className="text-sm font-semibold">{count}</div>
-                          <div className="text-[10px] text-slate-400">Milestones</div>
+                          <div className="text-sm font-semibold font-mono">{count}</div>
+                          <div className="text-[10px] text-slate-500">Milestones</div>
                         </button>
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-slate-400">
-                    Choose between 4 for compact sprints up to 16 for production-scale masteries. Each milestone includes deliverables and verified learning resources.
-                  </p>
                 </div>
 
-                {/* Timeline Range Slider */}
+                {/* Duration Slider */}
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                      Target Duration: <span className="text-indigo-400 font-bold">{durationMonths} Months</span>
+                  <div className="flex justify-between items-center text-xs">
+                    <label className="font-semibold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                      Course Duration
                     </label>
+                    <span className="font-mono font-bold text-blue-400">{durationMonths} Months</span>
                   </div>
                   <input
                     type="range"
@@ -501,20 +471,20 @@ export default function WizardPage() {
                     max={24}
                     value={durationMonths}
                     onChange={(e) => setDurationMonths(Number(e.target.value))}
-                    className="w-full accent-indigo-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                    className="w-full accent-blue-600 h-2 bg-[#0e141f] rounded-lg cursor-pointer"
                   />
-                  <div className="flex justify-between text-[11px] text-slate-500">
-                    <span>1 month (Sprint)</span>
-                    <span>3 months</span>
-                    <span>6 months</span>
-                    <span>12 months</span>
-                    <span>24 months (Mastery)</span>
+                  <div className="flex justify-between text-[11px] text-slate-500 font-mono">
+                    <span>1 mo (Sprint)</span>
+                    <span>3 mo</span>
+                    <span>6 mo</span>
+                    <span>12 mo</span>
+                    <span>24 mo (Mastery)</span>
                   </div>
                 </div>
 
-                {/* Milestone Frequency / Pacing Control */}
+                {/* Pacing Control */}
                 <div className="space-y-2.5">
-                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono">
                     Milestone Frequency
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -525,32 +495,28 @@ export default function WizardPage() {
                         onClick={() => setPacing(opt.value)}
                         className={`p-3 rounded-xl border text-left text-xs transition-all ${
                           pacing === opt.value
-                            ? 'bg-indigo-500/20 border-indigo-500 text-indigo-200'
-                            : 'bg-slate-800/40 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                            ? 'bg-blue-600/10 border-blue-500 text-white'
+                            : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200 hover:border-[#3b4c68]'
                         }`}
                       >
-                        <p className="font-semibold text-slate-200">{opt.label}</p>
+                        <p className="font-semibold text-white">{opt.label}</p>
                         <p className="text-[11px] text-slate-400 mt-0.5">{opt.description}</p>
                       </button>
                     ))}
                   </div>
 
-                  {/* Overload Guardrail Alert */}
                   {isOverloadBlocked && (
                     <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 shrink-0" />
-                      <span>
-                        <strong>Overload Warning:</strong> Daily pacing is restricted on plans longer
-                        than 6 months to prevent burnout. Choose Weekly or Bi-weekly.
-                      </span>
+                      <span>Daily pacing is restricted on plans longer than 6 months to prevent burnout.</span>
                     </div>
                   )}
                 </div>
 
                 {/* Difficulty Selector */}
                 <div className="space-y-2.5">
-                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                    Target Difficulty Level
+                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono">
+                    Target Difficulty
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {DIFFICULTY_LEVELS.map((level) => {
@@ -560,10 +526,10 @@ export default function WizardPage() {
                           key={level}
                           type="button"
                           onClick={() => setDifficulty(level)}
-                          className={`p-3 rounded-xl border text-center text-xs capitalize transition-all ${
+                          className={`p-2.5 rounded-xl border text-center text-xs capitalize transition-all ${
                             isSelected
-                              ? 'bg-indigo-500/20 border-indigo-500 text-indigo-200 font-semibold'
-                              : 'bg-slate-800/40 border-slate-800 text-slate-400 hover:text-slate-200'
+                              ? 'bg-blue-600/10 border-blue-500 text-white font-semibold'
+                              : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200'
                           }`}
                         >
                           {level}
@@ -573,59 +539,52 @@ export default function WizardPage() {
                   </div>
                 </div>
 
-                {/* Blueprint Summary Card */}
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Blueprint Summary
+                {/* Blueprint Summary Receipt */}
+                <div className="p-4 rounded-xl bg-[#0e141f] border border-[#1e293b] space-y-3 font-mono text-xs">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 block">
+                    Curriculum Specification
                   </span>
-                  <p className="text-xs font-medium text-slate-200">
-                    {selectedTitle ? (
-                      <>
-                        <span className="text-indigo-400 font-bold">{selectedTitle}</span>
-                        <span className="text-slate-400 block mt-0.5">{goal}</span>
-                      </>
-                    ) : (
-                      goal
-                    )}
+                  <p className="text-slate-200 font-sans font-semibold text-sm">
+                    {selectedTitle || goal}
                   </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#1e293b] text-[11px]">
                     <div>
-                      <span className="text-slate-400">Difficulty</span>
-                      <p className="font-semibold text-slate-200 capitalize mt-0.5">{difficulty}</p>
+                      <span className="text-slate-500">Difficulty</span>
+                      <p className="text-white capitalize">{difficulty}</p>
                     </div>
                     <div>
-                      <span className="text-slate-400">Duration</span>
-                      <p className="font-semibold text-slate-200 mt-0.5">{durationMonths} Months</p>
+                      <span className="text-slate-500">Duration</span>
+                      <p className="text-white">{durationMonths} Months</p>
                     </div>
                     <div>
-                      <span className="text-slate-400">Frequency</span>
-                      <p className="font-semibold text-slate-200 capitalize mt-0.5">{pacing}</p>
+                      <span className="text-slate-500">Pacing</span>
+                      <p className="text-white capitalize">{pacing}</p>
                     </div>
                     <div>
-                      <span className="text-slate-400">Milestones</span>
-                      <p className="font-semibold text-indigo-400 mt-0.5">{targetMilestones} Milestones</p>
+                      <span className="text-slate-500">Milestones</span>
+                      <p className="text-blue-400 font-bold">{targetMilestones}</p>
                     </div>
                   </div>
                 </div>
 
                 {isGenerating ? (
-                  <div className="p-8 rounded-2xl bg-indigo-950/20 border border-indigo-500/30 text-center space-y-4">
+                  <div className="p-8 rounded-2xl bg-[#0e141f] border border-blue-500/30 text-center space-y-3">
                     <Spinner size="lg" />
                     <div className="space-y-1">
-                      <p className="text-sm font-semibold text-indigo-300">
+                      <p className="text-sm font-semibold text-white">
                         {generationStepText}
                       </p>
-                      <p className="text-xs text-slate-400">
-                        Synthesizing verified documentation, playlists, and learning deliverables...
+                      <p className="text-xs text-slate-400 font-mono">
+                        Synthesizing verified documentation and deliverables...
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex justify-between items-center pt-4 border-t border-slate-800">
+                  <div className="flex justify-between items-center pt-4 border-t border-[#1e293b]">
                     <button
                       type="button"
                       onClick={() => setStep(0)}
-                      className="btn-secondary inline-flex items-center gap-1.5 text-xs py-2 px-4"
+                      className="btn-secondary text-xs py-2 px-4 inline-flex items-center gap-1.5"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
                       Back to Objective
@@ -634,10 +593,9 @@ export default function WizardPage() {
                       type="button"
                       disabled={isOverloadBlocked}
                       onClick={handleGenerate}
-                      className="btn-primary inline-flex items-center gap-2 text-sm py-3 px-6 shadow-lg shadow-indigo-500/20 disabled:opacity-50"
+                      className="btn-primary text-xs py-2.5 px-6 font-semibold"
                     >
-                      <Sparkles className="w-4 h-4" />
-                      Generate Adaptive Blueprint
+                      Generate Complete Blueprint
                     </button>
                   </div>
                 )}

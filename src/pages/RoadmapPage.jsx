@@ -19,9 +19,7 @@ import {
   FileText,
   Code,
   Brain,
-  Award,
   Layers,
-  Share2,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import ProgressRing from '../components/common/ProgressRing';
@@ -45,13 +43,8 @@ export default function RoadmapPage() {
   } = useRoadmapDetail(id);
   const { awardXp } = useStats();
 
-  // Expanded milestone accordion states
   const [expandedId, setExpandedId] = useState(null);
-
-  // Outcomes Modal State
   const [showOutcomesModal, setShowOutcomesModal] = useState(false);
-
-  // Micro-Quiz Gate Modal State
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [quizLoading, setQuizLoading] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState([]);
@@ -59,11 +52,9 @@ export default function RoadmapPage() {
   const [quizAnswers, setQuizAnswers] = useState({});
   const [quizError, setQuizError] = useState('');
 
-  // Rebalance toast simulation
   const [isRebalancing, setIsRebalancing] = useState(false);
   const [rebalanceToast, setRebalanceToast] = useState('');
 
-  // Auto-expand first incomplete milestone when loaded
   React.useEffect(() => {
     if (milestones.length > 0 && expandedId === null) {
       const firstIncomplete = milestones.find((m) => !m.is_completed) || milestones[0];
@@ -74,23 +65,20 @@ export default function RoadmapPage() {
   if (loading || !roadmap) {
     return (
       <Layout>
-        <div className="py-24 flex flex-col items-center justify-center space-y-4">
+        <div className="py-24 flex flex-col items-center justify-center space-y-3">
           <Spinner size="lg" />
-          <p className="text-xs text-slate-400">Loading blueprint details...</p>
+          <p className="text-xs text-slate-400 font-mono">Loading curriculum specification...</p>
         </div>
       </Layout>
     );
   }
 
-  // Calculate dynamic progress
   const completedCount = milestones.filter((m) => m.is_completed).length;
   const progressPercent = milestones.length > 0
     ? Math.round((completedCount / milestones.length) * 100)
     : 0;
 
-  // Toggle milestone completion (Triggers Micro-Quiz if milestone is major)
   const handleMilestoneToggle = async (milestone) => {
-    // If completing a major milestone that isn't complete yet -> trigger Quiz Gate!
     if (!milestone.is_completed && milestone.is_major) {
       setPendingQuizMilestone(milestone);
       setQuizAnswers({});
@@ -112,7 +100,6 @@ export default function RoadmapPage() {
       return;
     }
 
-    // Direct toggle
     const willBeCompleted = !milestone.is_completed;
     toggleMilestone(milestone.id, milestone.is_completed);
 
@@ -121,7 +108,6 @@ export default function RoadmapPage() {
     }
   };
 
-  // Submit Micro-Quiz
   const handleQuizSubmit = (e) => {
     e.preventDefault();
     if (Object.keys(quizAnswers).length < quizQuestions.length) {
@@ -131,14 +117,13 @@ export default function RoadmapPage() {
 
     if (pendingQuizMilestone) {
       toggleMilestone(pendingQuizMilestone.id, false);
-      awardXp((pendingQuizMilestone.xp_reward || 200) + 100); // bonus quiz XP
+      awardXp((pendingQuizMilestone.xp_reward || 200) + 100);
     }
 
     setShowQuizModal(false);
     setPendingQuizMilestone(null);
   };
 
-  // Adaptive Rebalance Schedule Action
   const handleRebalance = async () => {
     setIsRebalancing(true);
     const incomplete = milestones.filter((m) => !m.is_completed);
@@ -158,7 +143,6 @@ export default function RoadmapPage() {
     }
   };
 
-  // Export to Markdown
   const handleExportMarkdown = () => {
     let md = `# ${roadmap.title}\n\n`;
     md += `**Goal:** ${roadmap.goal_summary}\n`;
@@ -192,32 +176,17 @@ export default function RoadmapPage() {
     document.body.removeChild(link);
   };
 
-  // Export to .ics Calendar format
   const handleExportCalendar = () => {
-    let ics = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//Milestone AI//Adaptive Learning Blueprints//EN',
-      'CALSCALE:GREGORIAN',
-    ];
-
+    let ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Milestone AI//Roadmap Calendar//EN\nCALSCALE:GREGORIAN\n`;
     milestones.forEach((m, idx) => {
       const now = new Date();
-      const dueDate = new Date(now.getTime() + (idx + 1) * 7 * 24 * 60 * 60 * 1000);
-      const dateStr = dueDate.toISOString().slice(0, 10).replace(/-/g, '');
-
-      ics.push('BEGIN:VEVENT');
-      ics.push(`UID:milestone-${m.id}@milestoneai.dev`);
-      ics.push(`DTSTAMP:${now.toISOString().slice(0, 10).replace(/-/g, '')}T090000Z`);
-      ics.push(`DTSTART;VALUE=DATE:${dateStr}`);
-      ics.push(`SUMMARY:🎯 Milestone: ${m.title}`);
-      ics.push(`DESCRIPTION:${(m.description || '').replace(/\n/g, ' ')}`);
-      ics.push('END:VEVENT');
+      const targetDate = new Date(now.getTime() + (idx + 1) * 7 * 24 * 60 * 60 * 1000);
+      const dateStr = targetDate.toISOString().replace(/[-:]/g, '').slice(0, 8);
+      ics += `BEGIN:VEVENT\nSUMMARY:Milestone ${idx + 1}: ${m.title}\nDESCRIPTION:${m.description.replace(/\n/g, ' ')}\nDTSTART;VALUE=DATE:${dateStr}\nSTATUS:CONFIRMED\nEND:VEVENT\n`;
     });
+    ics += `END:VCALENDAR`;
 
-    ics.push('END:VCALENDAR');
-
-    const blob = new Blob([ics.join('\r\n')], { type: 'text/calendar;charset=utf-8;' });
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -240,22 +209,22 @@ export default function RoadmapPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Rebalance Toast Notice */}
+        {/* Rebalance Toast */}
         <AnimatePresence>
           {rebalanceToast && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="p-3.5 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-200 text-xs flex items-center justify-between shadow-lg"
+              exit={{ opacity: 0, y: -8 }}
+              className="p-3.5 rounded-xl bg-blue-950/40 border border-blue-500/40 text-blue-200 text-xs flex items-center justify-between shadow-lg"
             >
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-indigo-400" />
+                <Sparkles className="w-4 h-4 text-blue-400" />
                 <span>{rebalanceToast}</span>
               </div>
               <button
                 onClick={() => setRebalanceToast('')}
-                className="text-xs text-indigo-300 font-bold hover:text-white"
+                className="text-xs text-blue-300 font-semibold hover:text-white"
               >
                 Dismiss
               </button>
@@ -263,23 +232,23 @@ export default function RoadmapPage() {
           )}
         </AnimatePresence>
 
-        {/* Roadmap Blueprint Header Card */}
-        <div className="card p-5 sm:p-7 space-y-5">
+        {/* Blueprint Overview Header Card */}
+        <div className="p-5 sm:p-7 rounded-2xl bg-[#121824] border border-[#242f42] space-y-5">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-            <div className="space-y-2 max-w-2xl">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <div className="space-y-2.5 max-w-2xl">
+              <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold uppercase">
                   {roadmap.difficulty}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
-                  {roadmap.duration_months} Months Timeline
+                <span className="px-2 py-0.5 rounded bg-[#0e141f] text-slate-300 border border-[#1e293b]">
+                  {roadmap.duration_months} Months
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
-                  {roadmap.pacing} Pacing
+                <span className="px-2 py-0.5 rounded bg-[#0e141f] text-slate-300 border border-[#1e293b] capitalize">
+                  {roadmap.pacing}
                 </span>
               </div>
 
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-100 tracking-tight">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight">
                 {roadmap.title}
               </h1>
 
@@ -288,87 +257,82 @@ export default function RoadmapPage() {
               </p>
             </div>
 
-            {/* Circular Progress Display */}
-            <div className="flex items-center gap-4 self-center md:self-start shrink-0 p-3 bg-slate-900/60 rounded-2xl border border-slate-800">
-              <ProgressRing progress={progressPercent} size={74} strokeWidth={6} />
-              <div className="text-left">
-                <p className="text-xs text-slate-400 font-medium">Blueprint Progress</p>
-                <p className="text-lg font-bold text-slate-100">
-                  {completedCount} <span className="text-xs font-normal text-slate-400">of</span> {milestones.length}
+            {/* Circular Progress Gauge */}
+            <div className="flex items-center gap-3.5 p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] shrink-0 self-start">
+              <ProgressRing progress={progressPercent} size={64} strokeWidth={5} />
+              <div className="text-left font-mono">
+                <span className="text-[11px] text-slate-500 block uppercase">Progress</span>
+                <p className="text-lg font-bold text-white">
+                  {completedCount}<span className="text-xs text-slate-500 font-normal">/{milestones.length}</span>
                 </p>
-                <p className="text-[11px] text-indigo-400 font-medium">milestones completed</p>
+                <span className="text-[10px] text-emerald-400 font-medium">completed</span>
               </div>
             </div>
           </div>
 
           {/* Action Toolbar */}
-          <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+          <div className="pt-4 border-t border-[#1e293b] flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Key Outcomes Modal Trigger */}
               <button
                 type="button"
                 onClick={() => setShowOutcomesModal(true)}
-                className="btn-secondary text-xs py-2 px-3 inline-flex items-center gap-1.5"
+                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
               >
-                <Target className="w-3.5 h-3.5 text-indigo-400" />
+                <Target className="w-3.5 h-3.5 text-blue-400" />
                 Key Target Outcomes
               </button>
 
-              {/* Adaptive Rebalance Button */}
               <button
                 type="button"
                 onClick={handleRebalance}
                 disabled={isRebalancing}
-                className="btn-secondary text-xs py-2 px-3 inline-flex items-center gap-1.5 disabled:opacity-50"
-                title="Redistribute remaining milestones evenly without losing completed progress"
+                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 disabled:opacity-50"
+                title="Redistribute remaining milestones evenly without losing progress"
               >
                 <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isRebalancing ? 'animate-spin' : ''}`} />
-                {isRebalancing ? 'Rebalancing with AI...' : 'Adaptive Rebalance'}
+                {isRebalancing ? 'Adapting...' : 'Adaptive Rebalance'}
               </button>
 
-              {/* Export Markdown */}
               <button
                 type="button"
                 onClick={handleExportMarkdown}
-                className="btn-secondary text-xs py-2 px-3 inline-flex items-center gap-1.5"
+                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
                 title="Export complete roadmap to Markdown document"
               >
                 <Download className="w-3.5 h-3.5 text-slate-400" />
                 Export .md
               </button>
 
-              {/* Export Calendar (.ics) */}
               <button
                 type="button"
                 onClick={handleExportCalendar}
-                className="btn-secondary text-xs py-2 px-3 inline-flex items-center gap-1.5"
-                title="Download iCalendar file to sync milestone due dates with Apple / Google Calendar"
+                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
+                title="Sync calendar with due dates"
               >
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
                 Sync .ics
               </button>
             </div>
 
-            {/* Launch AI Mentor Chat Link */}
             <Link
               to={`/roadmap/${roadmap.id}/chat`}
-              className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-2"
+              className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-2 font-semibold"
             >
-              <MessageSquare className="w-4 h-4" />
-              Chat with Guardrailed Mentor
+              <MessageSquare className="w-3.5 h-3.5" />
+              Chat with Mentor
             </Link>
           </div>
         </div>
 
-        {/* Milestones List */}
+        {/* Milestones Curriculum Sequence */}
         <div className="space-y-3.5">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
-              <Layers className="w-5 h-5 text-indigo-400" />
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Layers className="w-4 h-4 text-blue-400" />
               Curriculum Milestones
             </h2>
-            <span className="text-xs text-slate-400">
-              Click checkboxes to update your progress
+            <span className="text-xs font-mono text-slate-400">
+              Check deliverables to advance progress
             </span>
           </div>
 
@@ -381,68 +345,67 @@ export default function RoadmapPage() {
               return (
                 <div
                   key={m.id}
-                  className={`card transition-all duration-200 overflow-hidden ${
-                    m.is_completed ? 'border-slate-800/60 bg-slate-900/40' : 'hover:border-slate-700'
+                  className={`rounded-2xl border transition-all duration-150 overflow-hidden ${
+                    m.is_completed
+                      ? 'bg-[#0d131d] border-[#1a2332]'
+                      : 'bg-[#121824] border-[#242f42] hover:border-[#3b4c68]'
                   }`}
                 >
-                  {/* Milestone Card Summary Header */}
+                  {/* Milestone Card Header */}
                   <div
                     className="p-4 sm:p-5 flex items-start gap-3.5 cursor-pointer select-none"
                     onClick={() => setExpandedId(isExpanded ? null : m.id)}
                   >
-                    {/* Completion Checkbox Button */}
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleMilestoneToggle(m);
                       }}
-                      className="mt-0.5 text-slate-400 hover:text-indigo-400 transition-colors"
+                      className="mt-0.5 text-slate-500 hover:text-blue-400 transition-colors"
                       aria-label="Toggle milestone completion"
                     >
                       {m.is_completed ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-400/20" />
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-400/10" />
                       ) : (
-                        <Circle className="w-5 h-5 hover:text-indigo-400" />
+                        <Circle className="w-5 h-5" />
                       )}
                     </button>
 
-                    {/* Milestone Title & Metadata */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                          Milestone {idx + 1}
+                      <div className="flex flex-wrap items-center gap-2 mb-1 font-mono text-xs">
+                        <span className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
+                          Milestone {String(idx + 1).padStart(2, '0')}
                         </span>
                         {m.is_major && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
                             <Brain className="w-3 h-3" />
-                            Gated Micro-Quiz
+                            Gated Quiz
                           </span>
                         )}
-                        <span className="text-[11px] text-indigo-400 font-medium ml-auto">
+                        <span className="text-[11px] text-blue-400 ml-auto">
                           +{m.xp_reward} XP
                         </span>
                       </div>
 
                       <h3
                         className={`text-sm sm:text-base font-bold tracking-tight transition-colors ${
-                          m.is_completed ? 'line-through text-slate-400' : 'text-slate-100'
+                          m.is_completed ? 'line-through text-slate-500' : 'text-white'
                         }`}
                       >
                         {m.title}
                       </h3>
 
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-1">
-                        {completedDeliverables} of {deliverables.length} deliverables checked
+                      <p className="text-xs text-slate-400 mt-1 line-clamp-1 font-mono text-[11px]">
+                        {completedDeliverables} of {deliverables.length} deliverables complete
                       </p>
                     </div>
 
-                    {/* Expand/Collapse Chevron */}
                     <button
                       type="button"
-                      className="p-1 rounded-lg text-slate-400 hover:text-slate-200"
+                      className="p-1 rounded text-slate-400 hover:text-white"
                     >
-                      {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
                   </div>
 
@@ -453,32 +416,31 @@ export default function RoadmapPage() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="px-4 sm:px-5 pb-5 pt-1 border-t border-slate-800/80 space-y-4"
+                        transition={{ duration: 0.15 }}
+                        className="px-4 sm:px-5 pb-5 pt-1 border-t border-[#1e293b] space-y-4"
                       >
-                        {/* Description */}
                         <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mt-2">
                           {m.description}
                         </p>
 
                         {/* Deliverables Checklist */}
                         <div className="space-y-2">
-                          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wider block">
                             Required Deliverables Checklist
-                          </p>
+                          </span>
                           <div className="space-y-1.5">
                             {deliverables.map((del) => (
                               <label
                                 key={del.id}
-                                className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-800/40 cursor-pointer text-xs transition-colors"
+                                className="flex items-start gap-2.5 p-2 rounded-lg bg-[#0e141f] border border-[#1e293b] hover:border-[#2d3a4e] cursor-pointer text-xs transition-colors"
                               >
                                 <input
                                   type="checkbox"
                                   checked={del.is_completed}
                                   onChange={() => toggleDeliverable(m.id, del.id, del.is_completed)}
-                                  className="mt-0.5 rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 accent-indigo-500"
+                                  className="mt-0.5 rounded border-slate-700 text-blue-600 focus:ring-blue-500 accent-blue-600"
                                 />
-                                <span className={del.is_completed ? 'line-through text-slate-400' : 'text-slate-200'}>
+                                <span className={del.is_completed ? 'line-through text-slate-500' : 'text-slate-200'}>
                                   {del.title}
                                 </span>
                               </label>
@@ -487,33 +449,35 @@ export default function RoadmapPage() {
                         </div>
 
                         {/* Curated Resources */}
-                        <div className="space-y-2">
-                          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                            Curated Learning Resources
-                          </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {(m.resources || []).map((res) => {
-                              const ResIcon = getResourceIcon(res.type);
-                              return (
-                                <a
-                                  key={res.id}
-                                  href={res.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-2.5 rounded-xl bg-slate-800/40 border border-slate-800 hover:border-slate-700 hover:bg-slate-800/80 text-xs flex items-center justify-between gap-2 transition-all group"
-                                >
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <ResIcon className="w-4 h-4 text-indigo-400 shrink-0" />
-                                    <span className="text-slate-200 font-medium truncate group-hover:text-indigo-300">
-                                      {res.title}
-                                    </span>
-                                  </div>
-                                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 shrink-0 group-hover:text-slate-300" />
-                                </a>
-                              );
-                            })}
+                        {(m.resources || []).length > 0 && (
+                          <div className="space-y-2 pt-1">
+                            <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wider block">
+                              Curated Learning Resources
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {m.resources.map((res, rIdx) => {
+                                const Icon = getResourceIcon(res.type);
+                                return (
+                                  <a
+                                    key={rIdx}
+                                    href={res.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2.5 rounded-lg bg-[#0e141f] border border-[#1e293b] hover:border-blue-500/40 text-xs flex items-center justify-between gap-2 group transition-colors"
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <Icon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                      <span className="text-slate-300 group-hover:text-white truncate">
+                                        {res.title}
+                                      </span>
+                                    </div>
+                                    <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-blue-400 shrink-0" />
+                                  </a>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -522,111 +486,105 @@ export default function RoadmapPage() {
             })}
           </div>
         </div>
+      </div>
 
-        {/* Key Outcomes Modal */}
-        <Modal
-          isOpen={showOutcomesModal}
-          onClose={() => setShowOutcomesModal(false)}
-          title="Key Target Outcomes"
-        >
-          <div className="space-y-4">
-            <p className="text-xs text-slate-400">
-              Upon successful completion of this blueprint, you will have demonstrably achieved:
-            </p>
-            <div className="space-y-2.5">
-              {(roadmap.key_outcomes || []).map((outcome, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-slate-800/40 border border-slate-800 text-xs sm:text-sm text-slate-200"
-                >
-                  <Target className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                  <span>{outcome}</span>
-                </div>
-              ))}
-            </div>
-            <div className="pt-3 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowOutcomesModal(false)}
-                className="btn-primary text-xs py-2 px-4"
+      {/* Target Key Outcomes Modal */}
+      <Modal
+        isOpen={showOutcomesModal}
+        onClose={() => setShowOutcomesModal(false)}
+        title="Key Target Outcomes"
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-slate-400 leading-relaxed">
+            By completing this blueprint, you will master and independently verify the following capabilities:
+          </p>
+          <div className="space-y-2">
+            {(roadmap.key_outcomes || []).map((outcome, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-2.5 p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] text-xs text-slate-200"
               >
-                Close
-              </button>
-            </div>
+                <Target className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                <span>{outcome}</span>
+              </div>
+            ))}
           </div>
-        </Modal>
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => setShowOutcomesModal(false)}
+              className="btn-primary text-xs py-2 px-4"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </Modal>
 
-        {/* Gated Micro-Quiz Modal */}
-        <Modal
-          isOpen={showQuizModal}
-          onClose={() => setShowQuizModal(false)}
-          title="Major Milestone AI Gate Quiz 🧠"
-        >
-          {quizLoading ? (
-            <div className="p-8 text-center space-y-3">
-              <Spinner size="md" />
-              <p className="text-xs text-slate-400">
-                Generating verification questions for "{pendingQuizMilestone?.title}"...
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={handleQuizSubmit} className="space-y-5">
-              <p className="text-xs text-slate-400">
-                Before marking this major milestone complete and collecting XP, pass this verification
-                quiz curated by Gemini AI to test genuine conceptual retention.
-              </p>
+      {/* Micro-Quiz Gate Modal */}
+      <Modal
+        isOpen={showQuizModal}
+        onClose={() => setShowQuizModal(false)}
+        title="Milestone Verification Quiz"
+      >
+        {quizLoading ? (
+          <div className="py-10 text-center space-y-3">
+            <Spinner size="md" />
+            <p className="text-xs text-slate-400 font-mono">Synthesizing verification scenario questions...</p>
+          </div>
+        ) : (
+          <form onSubmit={handleQuizSubmit} className="space-y-4">
+            <p className="text-xs text-slate-400">
+              Answer these short conceptual scenarios to certify mastery of <strong>{pendingQuizMilestone?.title}</strong> and earn bonus XP!
+            </p>
 
-              {quizError && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
-                  {quizError}
-                </div>
-              )}
+            {quizError && (
+              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+                {quizError}
+              </div>
+            )}
 
-              {quizQuestions.map((q, idx) => (
-                <div key={q.id || idx} className="space-y-2">
-                  <p className="text-xs font-semibold text-slate-200">
-                    {idx + 1}. {q.question}
+            <div className="space-y-3">
+              {quizQuestions.map((q, qIdx) => (
+                <div key={qIdx} className="p-3.5 rounded-xl bg-[#0e141f] border border-[#1e293b] space-y-2 text-xs">
+                  <p className="font-semibold text-slate-200">
+                    {qIdx + 1}. {q.question}
                   </p>
-                  <div className="space-y-1">
-                    {q.options.map((opt, oIdx) => (
-                      <label
-                        key={oIdx}
-                        className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer text-xs text-slate-300"
-                      >
+                  <div className="space-y-1.5 pl-1">
+                    {(q.options || []).map((opt, oIdx) => (
+                      <label key={oIdx} className="flex items-center gap-2 cursor-pointer hover:text-white">
                         <input
                           type="radio"
-                          name={`quiz-${q.id || idx}`}
-                          onChange={() =>
-                            setQuizAnswers((p) => ({ ...p, [q.id || idx]: oIdx }))
-                          }
-                          className="accent-indigo-500"
+                          name={`quiz-q-${qIdx}`}
+                          value={opt}
+                          onChange={() => setQuizAnswers({ ...quizAnswers, [qIdx]: opt })}
+                          className="accent-blue-600 text-blue-600"
                         />
-                        <span>{opt}</span>
+                        <span className="text-slate-300 text-xs">{opt}</span>
                       </label>
                     ))}
                   </div>
                 </div>
               ))}
+            </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowQuizModal(false)}
-                  className="btn-secondary text-xs py-2 px-4"
-                >
-                  Review Material First
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary text-xs py-2 px-4"
-                >
-                  Submit Answers & Complete (+XP)
-                </button>
-              </div>
-            </form>
-          )}
-        </Modal>
-      </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowQuizModal(false)}
+                className="btn-secondary text-xs py-2 px-4"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn-primary text-xs py-2 px-4"
+              >
+                Submit Answers &amp; Unlock
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </Layout>
   );
 }

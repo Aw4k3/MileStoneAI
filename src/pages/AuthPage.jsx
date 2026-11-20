@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, Eye, EyeOff, Rocket, Sparkles, ArrowRight, RefreshCw } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Rocket, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Spinner from '../components/common/Spinner';
 
@@ -18,7 +18,6 @@ export default function AuthPage() {
   const { user, login, signup, loginWithGoogle, loading, wipeAllLocalData } = useAuth();
   const navigate = useNavigate();
 
-  // If already logged in, redirect straight to dashboard
   useEffect(() => {
     if (user && !loading) {
       navigate('/dashboard', { replace: true });
@@ -30,7 +29,7 @@ export default function AuthPage() {
     setFormError('');
 
     if (!email || !password) {
-      setFormError('Please fill in both email and password.');
+      setFormError('Please enter both your email and password.');
       return;
     }
 
@@ -42,7 +41,7 @@ export default function AuthPage() {
       }
       navigate('/dashboard');
     } catch (err) {
-      setFormError(err.message || 'Authentication failed. Please try again.');
+      setFormError(err.message || 'Authentication failed. Please verify credentials.');
     }
   };
 
@@ -50,43 +49,43 @@ export default function AuthPage() {
     try {
       setIsGoogleLoading(true);
       setFormError('');
-      // Supabase signInWithOAuth will initiate the browser redirect to Google
       await loginWithGoogle();
-      // DO NOT call navigate('/dashboard') here, as that would prematurely mount
-      // the dashboard before the Google OAuth redirect finishes.
     } catch (err) {
       setIsGoogleLoading(false);
-      setFormError(err.message || 'Google Sign-In failed.');
+      setFormError(err.message || 'Google sign-in could not be completed.');
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-slate-950 text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-[#0b0f17] text-slate-100">
       {/* Brand Header */}
       <Link
         to="/"
-        className="flex items-center gap-2.5 mb-8 group transition-transform active:scale-95"
+        className="flex items-center gap-3 mb-8 group"
       >
-        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/30">
-          <Rocket className="w-5 h-5 text-white" />
+        <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold transition-transform group-hover:scale-105">
+          <Rocket className="w-4 h-4" />
         </div>
-        <span className="font-extrabold tracking-tight text-xl">
-          Milestone <span className="text-gradient">AI</span>
-        </span>
+        <div className="flex items-center gap-1.5 font-bold tracking-tight text-xl">
+          <span>Milestone</span>
+          <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            AI
+          </span>
+        </div>
       </Link>
 
       {/* Auth Card */}
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-8">
-        {/* Tab Switcher */}
-        <div className="flex border-b border-slate-800 mb-6 relative">
+      <div className="w-full max-w-sm bg-[#121824] border border-[#242f42] rounded-2xl p-6 sm:p-7 shadow-xl">
+        {/* Clean Segmented Tab Switcher */}
+        <div className="grid grid-cols-2 p-1 rounded-lg bg-[#0d131d] border border-[#1e293b] mb-6 text-xs">
           <button
             type="button"
             onClick={() => {
               setIsSignUp(false);
               setFormError('');
             }}
-            className={`flex-1 pb-3 text-sm font-semibold text-center transition-colors ${
-              !isSignUp ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            className={`py-1.5 font-medium rounded-md transition-all ${
+              !isSignUp ? 'bg-[#1a2332] text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Sign In
@@ -97,27 +96,16 @@ export default function AuthPage() {
               setIsSignUp(true);
               setFormError('');
             }}
-            className={`flex-1 pb-3 text-sm font-semibold text-center transition-colors ${
-              isSignUp ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            className={`py-1.5 font-medium rounded-md transition-all ${
+              isSignUp ? 'bg-[#1a2332] text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Create Account
           </button>
-
-          {/* Animated Active Indicator */}
-          <motion.div
-            className="absolute bottom-0 h-0.5 bg-indigo-500 rounded-full"
-            initial={false}
-            animate={{
-              left: !isSignUp ? '0%' : '50%',
-              width: '50%',
-            }}
-            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-          />
         </div>
 
         {formError && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-medium">
+          <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
             {formError}
           </div>
         )}
@@ -127,7 +115,7 @@ export default function AuthPage() {
           type="button"
           onClick={handleGoogle}
           disabled={loading || isGoogleLoading}
-          className="w-full py-2.5 px-4 rounded-xl border border-slate-800 bg-slate-800/40 hover:bg-slate-800 text-slate-200 text-sm font-medium flex items-center justify-center gap-2.5 transition-all mb-5 hover:border-slate-700 active:scale-[0.99] disabled:opacity-50"
+          className="w-full py-2.5 px-4 rounded-xl border border-[#242f42] bg-[#0d131d] hover:bg-[#161f2e] text-slate-200 text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors mb-5 disabled:opacity-50"
         >
           {isGoogleLoading ? (
             <div className="flex items-center gap-2">
@@ -160,34 +148,34 @@ export default function AuthPage() {
         </button>
 
         <div className="relative flex items-center justify-center mb-5">
-          <div className="border-t border-slate-800 w-full" />
-          <span className="bg-slate-900 px-3 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-            or with email
+          <div className="border-t border-[#1e293b] w-full" />
+          <span className="bg-[#121824] px-2.5 text-[11px] text-slate-500 font-mono">
+            or email
           </span>
-          <div className="border-t border-slate-800 w-full" />
+          <div className="border-t border-[#1e293b] w-full" />
         </div>
 
         {/* Email & Password Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5">
           <AnimatePresence mode="wait">
             {isSignUp && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.15 }}
               >
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Full Name
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="e.g. Alex Chen"
-                    className="input-field pl-10 text-sm"
+                    placeholder="Alex Chen"
+                    className="input-field pl-9 text-xs py-2.5"
                   />
                 </div>
               </motion.div>
@@ -195,53 +183,44 @@ export default function AuthPage() {
           </AnimatePresence>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
               Email Address
             </label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="input-field pl-10 text-sm"
+                className="input-field pl-9 text-xs py-2.5"
               />
             </div>
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-semibold text-slate-300">
                 Password
               </label>
-              {!isSignUp && (
-                <button
-                  type="button"
-                  onClick={() => alert('Please reset your password or sign in using Google.')}
-                  className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
-                >
-                  Forgot password?
-                </button>
-              )}
             </div>
             <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="input-field pl-10 pr-10 text-sm"
+                className="input-field pl-9 pr-9 text-xs py-2.5"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors p-1"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors p-1"
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
             </div>
           </div>
@@ -249,41 +228,28 @@ export default function AuthPage() {
           <button
             type="submit"
             disabled={loading || isGoogleLoading}
-            className="btn-primary w-full py-2.5 text-sm flex items-center justify-center gap-2 mt-2"
+            className="btn-primary w-full py-2.5 text-xs font-semibold mt-2"
           >
             {loading ? (
               <Spinner size="sm" />
             ) : isSignUp ? (
-              <>
-                Create Account
-                <ArrowRight className="w-4 h-4" />
-              </>
+              'Create Account'
             ) : (
-              <>
-                Sign In
-                <ArrowRight className="w-4 h-4" />
-              </>
+              'Sign In'
             )}
           </button>
         </form>
 
-        {/* Guest fallback & Clear Cache */}
-        <div className="mt-6 pt-5 border-t border-slate-800 text-center space-y-3">
-          <p className="text-xs text-slate-400">
-            Want to test first without an account?{' '}
-            <Link to="/dashboard" className="text-indigo-400 hover:text-indigo-300 font-semibold underline">
-              Browse as Guest →
-            </Link>
-          </p>
-
+        {/* Clear Cache Tool */}
+        <div className="mt-5 pt-4 border-t border-[#1e293b] text-center">
           <button
             type="button"
             onClick={wipeAllLocalData}
-            className="text-[11px] text-slate-500 hover:text-rose-400 transition-colors inline-flex items-center gap-1"
-            title="Purge all cached local browser data and cookies"
+            className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors inline-flex items-center gap-1 font-mono"
+            title="Purge cached session tokens"
           >
             <RefreshCw className="w-3 h-3" />
-            Clear local browser cache & reset
+            Reset local auth storage
           </button>
         </div>
       </div>

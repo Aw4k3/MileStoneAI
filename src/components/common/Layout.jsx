@@ -7,7 +7,6 @@ import {
   PlusCircle,
   Settings,
   LogOut,
-  Sparkles,
   Presentation,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,30 +29,30 @@ export default function Layout({ children }) {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/60">
+    <div className="min-h-screen flex flex-col bg-[#0b0f17] text-slate-100">
+      {/* Top Header */}
+      <header className="sticky top-0 z-40 bg-[#0b0f17]/95 backdrop-blur-md border-b border-[#1e293b]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Brand */}
           <Link
             to="/dashboard"
-            className="flex items-center gap-2.5 group transition-transform active:scale-95"
+            className="flex items-center gap-3 group"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/30 transition-shadow">
-              <Rocket className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shadow-sm transition-transform group-hover:scale-105">
+              <Rocket className="w-4 h-4" />
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold tracking-tight text-base sm:text-lg flex items-center gap-1.5">
-                Milestone <span className="text-gradient">AI</span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold tracking-tight text-base sm:text-lg text-white">
+                Milestone
               </span>
-              <span className="text-[10px] text-slate-400 font-medium tracking-wider uppercase -mt-1 hidden sm:block">
-                Adaptive Blueprints
+              <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                AI
               </span>
             </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1.5">
+          <nav className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.path;
@@ -61,35 +60,35 @@ export default function Layout({ children }) {
                 <Link
                   key={link.label}
                   to={link.path}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                      ? 'bg-[#1a2332] text-white border border-[#2e3d54]'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-[#121824]'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-blue-400' : 'text-slate-400'}`} />
                   {link.label}
                 </Link>
               );
             })}
           </nav>
 
-          {/* Right Action / Profile */}
+          {/* Right Profile / Actions */}
           <div className="flex items-center gap-3">
             {user ? (
-              <div className="flex items-center gap-2.5">
-                <div className="flex items-center gap-2 pl-2 pr-3 py-1 bg-slate-900 border border-slate-800 rounded-full">
-                  <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-xs font-bold border border-indigo-500/30">
-                    {user.display_name?.charAt(0) || 'A'}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 pl-2 pr-3 py-1 bg-[#121824] border border-[#242f42] rounded-lg">
+                  <div className="w-5 h-5 rounded bg-blue-600/20 text-blue-400 flex items-center justify-center text-[11px] font-bold font-mono">
+                    {user.display_name?.charAt(0) || 'U'}
                   </div>
-                  <span className="text-xs font-medium text-slate-300 hidden sm:inline max-w-[100px] truncate">
+                  <span className="text-xs font-medium text-slate-300 hidden sm:inline max-w-[120px] truncate">
                     {user.display_name}
                   </span>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors"
-                  title="Log out"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-[#121824] border border-transparent hover:border-[#242f42] transition-colors"
+                  title="Sign out"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -97,9 +96,8 @@ export default function Layout({ children }) {
             ) : (
               <Link
                 to="/auth"
-                className="btn-primary text-xs sm:text-sm py-2 px-4 inline-flex items-center gap-1.5"
+                className="btn-primary text-xs py-1.5 px-3.5 inline-flex items-center gap-1.5"
               >
-                <Sparkles className="w-3.5 h-3.5" />
                 Sign In
               </Link>
             )}
@@ -107,13 +105,13 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-10">
+      {/* Main Container */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-12">
         {children}
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800/80 px-6 py-2">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0b0f17]/95 backdrop-blur-md border-t border-[#1e293b] px-4 py-2">
         <div className="flex items-center justify-around max-w-md mx-auto">
           {navLinks.map((link) => {
             const Icon = link.icon;
@@ -123,11 +121,11 @@ export default function Layout({ children }) {
                 key={link.label}
                 to={link.path}
                 className={`flex flex-col items-center gap-1 py-1 px-3 transition-colors ${
-                  isActive ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+                  isActive ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-[11px] font-medium">{link.label}</span>
+                <Icon className="w-4 h-4" />
+                <span className="text-[10px] font-medium">{link.label}</span>
               </Link>
             );
           })}
