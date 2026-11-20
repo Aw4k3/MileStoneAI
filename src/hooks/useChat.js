@@ -84,6 +84,7 @@ export function useChat(roadmapId, roadmapTitle, goalSummary, activeMilestoneTit
         goal_summary: goalSummary,
         active_milestone: activeMilestoneTitle,
         persona,
+        model: geminiModel,
         gemini_model: geminiModel,
       });
 

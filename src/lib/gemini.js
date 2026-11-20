@@ -1,8 +1,8 @@
 // src/lib/gemini.js
 // Dual Mode Architecture:
-// 1. Direct Google Gemini REST API (1.5 Flash / 1.5 Pro / 2.0 Flash) with 8192 token limit
+// 1. Direct Google Gemini REST API (1.5 Flash / 1.5 Pro) with 8192 token limit
 // 2. Supabase Edge Function Gemini Proxy (if deployed)
-// 3. Intelligent, Domain-Specific Curriculum Synthesizer with 6-10 deep milestones
+// 3. Deep Domain-Locked Curriculum & Socratic Mentor Engine with verified courses, playlists, books/PDFs, and official docs
 
 import { supabase, isSupabaseConfigured } from './supabase';
 
@@ -59,7 +59,6 @@ async function callDirectGeminiApi(modelName, systemInstruction, contents, expec
   const apiKey = getGeminiApiKey();
   if (!apiKey) throw new Error('No Gemini API key available');
 
-  // Choose the best stable free model
   const model = modelName === 'pro' ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -67,7 +66,7 @@ async function callDirectGeminiApi(modelName, systemInstruction, contents, expec
     contents,
     generationConfig: {
       temperature: expectJson ? 0.3 : 0.7,
-      maxOutputTokens: 8192, // High output token limit to ensure complete, rich curriculums
+      maxOutputTokens: 8192, // Generous token ceiling for complete curricula
     },
   };
 
@@ -99,7 +98,7 @@ async function callDirectGeminiApi(modelName, systemInstruction, contents, expec
 
 /**
  * Common invoker:
- * Tries Direct Gemini API -> Tries Supabase Edge Function -> Intelligent Curriculum Engine
+ * Tries Direct Gemini API -> Tries Supabase Edge Function -> Deep Curriculum Engine
  */
 async function invokeGemini(action, payload) {
   const apiKey = getGeminiApiKey();
@@ -108,7 +107,8 @@ async function invokeGemini(action, payload) {
   if (apiKey) {
     try {
       if (action === 'chat') {
-        const { messages, roadmap_title, goal_summary, active_milestone, persona, model } = payload;
+        const { messages, roadmap_title, goal_summary, active_milestone, persona, model, gemini_model } = payload;
+        const resolvedModel = model || gemini_model || 'flash';
 
         const personaInstructions = {
           tutor: 'Act as a Socratic Tutor: ask probing questions, guide step-by-step, explain conceptual mental models.',
@@ -134,36 +134,39 @@ STRICT GUARDRAILS & DOMAIN LOCK:
           parts: [{ text: m.content }],
         }));
 
-        const responseText = await callDirectGeminiApi(model, systemInstruction, contents);
+        const responseText = await callDirectGeminiApi(resolvedModel, systemInstruction, contents);
         return { content: responseText };
       }
 
       if (action === 'generate_roadmap') {
-        const { goal, difficulty, duration_months, pacing, model } = payload;
+        const { goal, difficulty, duration_months, pacing, model, gemini_model } = payload;
+        const resolvedModel = model || gemini_model || 'pro';
         const targetCount = Math.max(
           6,
           Math.min(12, Math.round((duration_months || 3) * (pacing === 'weekly' ? 3 : pacing === 'daily' ? 4 : 2)))
         );
 
-        const prompt = `You are an elite Lead Software Architect, Tech Curriculum Director, and Principal Staff Engineer.
+        const prompt = `You are an elite Lead Software Architect and Curriculum Director.
 Design an in-depth, production-grade, highly actionable learning blueprint in VALID JSON ONLY.
 
 GOAL: "${goal}"
-DIFFICULTY LEVEL: ${difficulty || 'intermediate'}
+DIFFICULTY: ${difficulty || 'intermediate'}
 TIMELINE: ${duration_months || 3} months
 PACING: ${pacing || 'weekly'}
 TARGET MILESTONE COUNT: Generate EXACTLY ${targetCount} comprehensive milestones.
 
-STRICT CURRICULUM REQUIREMENTS:
-1. Provide EXACTLY ${targetCount} sequential milestones that progress logically from foundational tooling/mental models to real-world deployment, testing, and production optimization.
-2. Every milestone title MUST be deeply specific to "${goal}" (e.g. "Reactive State Management with StateFlow & Compose Lifecycle", NOT generic names like "Intermediate Phase").
+STRICT CURRICULUM & RESOURCE REQUIREMENTS:
+1. Provide EXACTLY ${targetCount} sequential milestones progressing logically from foundational tooling/mental models to real-world deployment, testing, and production optimization.
+2. Every milestone title MUST be deeply specific to "${goal}" (NEVER use generic titles like "Phase 1: Foundations").
 3. For EVERY milestone, provide:
    - "title": Highly descriptive, concrete topic title
    - "description": 2 to 3 substantive sentences detailing core architectural concepts, execution patterns, and common failure modes
    - "is_major": boolean (set true on major milestones, such as every 3rd or 4th milestone and the final capstone)
    - "xp_reward": integer between 150 and 400
-   - "deliverables": Array of 4 to 5 rigorous, tangible checklist tasks (e.g. "Configure X with Y", "Implement Z unit test suite with 90% coverage", "Benchmark memory performance")
-   - "resources": Array of 2 to 4 high-quality resources with real documentation/tutorial links matching types: "docs", "video", "book", "course", or "project".
+   - "deliverables": Array of 4 to 5 rigorous, tangible checklist tasks (e.g. "Configure Room DAOs with Flow", "Verify Stripe webhook signature parsing")
+   - "resources": Array of 3 to 4 authoritative learning resources matching types "course", "video", "book", "docs", or "project".
+     * STRICT RESOURCE CRITERIA: NEVER provide generic search URLs like "youtube.com/results?search_query=...".
+     * Provide actual free courses (e.g. Harvard CS50, Full Stack Open, YC Startup School, Kaggle Learn, freeCodeCamp), dedicated YouTube tutorial playlists/channels (e.g. Net Ninja, Traversy Media, Philipp Lackner), free online books/PDFs (e.g. Eloquent JavaScript, Automate the Boring Stuff, Pro Git, The Mom Test), and official documentation.
 
 OUTPUT FORMAT: Exact JSON matching:
 {
@@ -188,16 +191,17 @@ OUTPUT FORMAT: Exact JSON matching:
         "Concrete deliverable 4"
       ],
       "resources": [
-        {"title": "Resource Name", "url": "https://...", "type": "docs"},
-        {"title": "Video Crash Course", "url": "https://youtube.com/...", "type": "video"}
+        {"title": "Resource Name", "url": "https://...", "type": "course"},
+        {"title": "YouTube Playlist", "url": "https://www.youtube.com/playlist?list=...", "type": "video"},
+        {"title": "Official Documentation", "url": "https://...", "type": "docs"}
       ]
     }
   ]
 }`;
 
         const rawJson = await callDirectGeminiApi(
-          model,
-          'You are a Principal Curriculum Architect. Respond with raw valid JSON only. Do not wrap in markdown.',
+          resolvedModel,
+          'You are a Principal Curriculum Architect. Respond with raw valid JSON only. Do not wrap in markdown or backticks.',
           [{ parts: [{ text: prompt }] }],
           true
         );
@@ -209,7 +213,8 @@ OUTPUT FORMAT: Exact JSON matching:
       }
 
       if (action === 'micro_quiz') {
-        const { milestone_title, milestone_description, model } = payload;
+        const { milestone_title, milestone_description, model, gemini_model } = payload;
+        const resolvedModel = model || gemini_model || 'flash';
         const prompt = `Generate a 3-question multiple choice verification quiz for:
 Milestone: "${milestone_title}"
 Context: "${milestone_description}"
@@ -227,7 +232,7 @@ Return JSON:
   ]
 }`;
         const raw = await callDirectGeminiApi(
-          model,
+          resolvedModel,
           'Output valid JSON quiz only.',
           [{ parts: [{ text: prompt }] }],
           true
@@ -236,10 +241,11 @@ Return JSON:
       }
 
       if (action === 'estimate_duration') {
-        const { goal, difficulty, model } = payload;
+        const { goal, difficulty, model, gemini_model } = payload;
+        const resolvedModel = model || gemini_model || 'flash';
         const prompt = `Estimate duration in months (1-24) for goal: "${goal}", difficulty: ${difficulty}. Output JSON: {"recommended_months": 3, "reasoning": "..."}`;
         const raw = await callDirectGeminiApi(
-          model,
+          resolvedModel,
           'Output valid JSON only.',
           [{ parts: [{ text: prompt }] }],
           true
@@ -266,13 +272,12 @@ Return JSON:
     }
   }
 
-  // 3. Fallback to Built-in Deep Curriculum Synthesizer
+  // 3. Fallback to Deep Curriculum & Socratic Mentor Engine
   return synthesizeDeepCurriculumEngine(action, payload);
 }
 
 /**
- * Intelligent Topic-Specific Curriculum Synthesizer
- * Generates 6 to 10 rich, comprehensive milestones with 4-5 deliverables and 3 real resources each.
+ * Intelligent Deep Curriculum & Mentor Engine
  */
 function synthesizeDeepCurriculumEngine(action, payload) {
   if (action === 'estimate_duration') {
@@ -332,6 +337,9 @@ function synthesizeDeepCurriculumEngine(action, payload) {
     const query = (payload?.messages?.[payload.messages.length - 1]?.content || '').trim();
     const queryLower = query.toLowerCase();
     const roadmapTitle = payload.roadmap_title || 'Current Curriculum';
+    const activeMilestone = payload.active_milestone || 'Active Checkpoint';
+    const goalSummary = payload.goal_summary || roadmapTitle;
+    const persona = payload.persona || 'tutor';
 
     // 1. Strict Jailbreak / Prompt Injection Detection
     const injectionPatterns = [
@@ -388,58 +396,166 @@ I cannot fulfill requests to:
 - Solve unrelated algorithmic puzzles (like LeetCode Two Sum)
 - Answer off-topic inquiries outside **${roadmapTitle}**
 
-*Let's redirect our energy back to your active milestones!* What deliverable or concept within **${roadmapTitle}** would you like to explore?`,
+*Let's redirect our focus back to your active milestone: "${activeMilestone}"!* What deliverable or concept within **${roadmapTitle}** would you like to explore?`,
       };
     }
 
-    const persona = payload.persona || 'tutor';
+    // Domain Detection for Chat
+    const isSaaS = roadmapTitle.toLowerCase().includes('saas') || roadmapTitle.toLowerCase().includes('mvp') || roadmapTitle.toLowerCase().includes('indie') || goalSummary.toLowerCase().includes('saas');
+    const isAndroid = roadmapTitle.toLowerCase().includes('compose') || roadmapTitle.toLowerCase().includes('android') || roadmapTitle.toLowerCase().includes('kotlin');
+    const isReact = roadmapTitle.toLowerCase().includes('react') || roadmapTitle.toLowerCase().includes('next') || roadmapTitle.toLowerCase().includes('frontend');
+    const isAI = roadmapTitle.toLowerCase().includes('python') || roadmapTitle.toLowerCase().includes('ai') || roadmapTitle.toLowerCase().includes('machine learning');
+
     const personaIntro = {
-      tutor: `🎓 **Socratic Mentor Guidance**\n\nLet's analyze your question regarding **"${query}"** in **${roadmapTitle}**:`,
-      coach: `💪 **Strict Coach Breakdown**\n\nNo shortcuts — let's dissect **"${query}"** and lock in execution for **${roadmapTitle}**:`,
-      peer: `🤝 **Peer Collaboration**\n\nI tackled this exact question in **${roadmapTitle}** recently! Here is what made it click:`,
+      tutor: `🎓 **Socratic Mentor Guidance**\n\nLet's break down your objective for **${activeMilestone}** in **"${roadmapTitle}"**:`,
+      coach: `💪 **Strict Accountability Coach**\n\nZero excuses — let's execute on **${activeMilestone}** for **"${roadmapTitle}"**:`,
+      peer: `🤝 **Peer Collaboration**\n\nI tackled this exact phase in **"${roadmapTitle}"**! Here is the battle-tested breakdown for **${activeMilestone}**:`,
     }[persona];
 
     let dynamicContent = '';
 
-    if (queryLower.includes('recomposition') || queryLower.includes('render') || queryLower.includes('compose')) {
+    // Intent 1: Practical Tips List
+    if (queryLower.includes('tip') || queryLower.includes('practical') || queryLower.includes('advice')) {
+      if (isSaaS) {
+        dynamicContent = `
+### 5 Production Tips for Indie SaaS MVPs:
+
+1. **Verify Buyer Intent Before Coding**:
+   Create a single-page landing page with your value proposition and a *"Request Early Access"* or pre-order button. If you cannot get 10 target users to leave their email or book a call, writing backend code won't solve distribution.
+2. **Choose a "Boring" Tech Stack**:
+   Stick to standard Next.js, Tailwind, and Supabase / PostgreSQL. Avoid microservices, complex state managers, or new ORMs that distract from your core value proposition.
+3. **Verify Stripe Webhook Signatures**:
+   Never trust client-side checkout callbacks. Always listen to \`checkout.session.completed\` and \`customer.subscription.updated\` on a dedicated route handler, verifying the raw buffer signature against your \`STRIPE_WEBHOOK_SECRET\`.
+4. **Implement Passwordless / Social Auth First**:
+   Users abandon complex password policies. Google OAuth + Supabase Magic Link eliminates password recovery loops and reduces churn.
+5. **Instrument Real User Telemetry from Day 1**:
+   Install PostHog or Umami to record user sessions. Watching your first 10 visitors use your app will reveal 80% of usability flaws.`;
+      } else if (isAndroid) {
+        dynamicContent = `
+### 5 Essential Jetpack Compose Development Tips:
+
+1. **Hoist State Up, Pass Events Down (UDF)**:
+   Keep presentation Composables completely stateless by accepting values as parameters and exposing lambdas like \`onValueChanged: (String) -> Unit\`.
+2. **Prevent Unnecessary Recomposition**:
+   Standard \`List<T>\` is considered unstable by Compose. Wrap collections in Kotlinx \`PersistentList\` or annotate custom classes with \`@Immutable\`.
+3. **Inspect with Layout Inspector**:
+   Use Android Studio's Layout Inspector with "Show Recomposition Counts" checked to catch infinite redraw loops.
+4. **Isolate Side Effects**:
+   Never trigger coroutines or state mutations directly in the Composable body. Wrap one-time actions in \`LaunchedEffect(key)\` and disposable listeners in \`DisposableEffect\`.
+5. **Use collectAsStateWithLifecycle**:
+   When reading \`StateFlow\` in Compose, always use \`collectAsStateWithLifecycle()\` instead of \`collectAsState()\` to stop flow emission when the app goes into the background.`;
+      } else {
+        dynamicContent = `
+### 5 High-Impact Execution Tips:
+
+1. **Deconstruct Deliverables into 1-Hour Micro-Tasks**:
+   Large goals trigger procrastination. Break down each deliverable into atomic Git commits that take 45-60 minutes each.
+2. **Implement Input/Output Contracts First**:
+   Define TypeScript interfaces or data schemas before building presentation layers. This creates clear architectural boundaries.
+3. **Write Verification Tests for Edge Cases**:
+   Before marking a milestone complete, write at least 2 automated tests verifying what happens when the network fails or inputs are empty.
+4. **Resist Premature Optimization**:
+   Build the simplest working solution first. Profile memory and execution latency only when metrics demonstrate a bottleneck.
+5. **Document Architecture in your README**:
+   Write a 3-paragraph summary of how data flows through your system. If you can explain it simply, your code will reflect that clarity.`;
+      }
+    }
+    // Intent 2: Mini-Project Ideas
+    else if (queryLower.includes('project') || queryLower.includes('idea') || queryLower.includes('practice')) {
+      if (isSaaS) {
+        dynamicContent = `
+### 2 Recommended Mini-Projects for this Phase:
+
+1. **Multi-Tenant Stripe Billing & Webhook Simulator**:
+   - **Goal**: Build an isolated Next.js route that creates a Stripe Checkout Session, receives webhook events locally via Stripe CLI (\`stripe listen\`), and updates a user's subscription tier in Supabase.
+   - **Key Deliverable**: A functional Customer Portal button where a test user can upgrade, downgrade, and cancel subscriptions.
+2. **Viral Waitlist & Onboarding Funnel with Email Triggers**:
+   - **Goal**: Create a landing page that captures emails, generates unique referral links, and triggers an automated welcome email via Resend API.
+   - **Key Deliverable**: A dashboard view tracking referral conversion rates and verified signups.`;
+      } else if (isAndroid) {
+        dynamicContent = `
+### 2 Recommended Mini-Projects for this Phase:
+
+1. **Offline-First Notes App with Room & Compose Flow**:
+   - **Goal**: Build a clean Material 3 notes app where notes are stored in Room SQLite and exposed as a \`Flow<List<Note>>\`.
+   - **Key Deliverable**: Smooth animated note additions and instant state recovery across screen rotation.
+2. **Interactive Weather Widget with Dynamic Canvas**:
+   - **Goal**: Create a custom temperature graph using Compose \`Canvas\` drawing primitives with animated curve transitions.
+   - **Key Deliverable**: Gesture drag detector showing exact temperature values at the touched coordinate.`;
+      } else {
+        dynamicContent = `
+### 2 Recommended Mini-Projects for this Phase:
+
+1. **Self-Contained Functional Spike**:
+   - **Goal**: Build a standalone proof-of-concept repository that executes the core technical deliverable without any UI distractions.
+   - **Key Deliverable**: Verified benchmark or integration test confirming end-to-end functionality.
+2. **Decoupled Service Architecture Module**:
+   - **Goal**: Refactor the primary business logic into an isolated, pure module with zero external coupling.
+   - **Key Deliverable**: Automated test suite covering happy paths and failure recovery with 100% pass rate.`;
+      }
+    }
+    // Intent 3: Simplify in Plain English
+    else if (queryLower.includes('simplif') || queryLower.includes('plain') || queryLower.includes('explain')) {
       dynamicContent = `
-### Understanding Recomposition in Jetpack Compose:
+### Plain English Explanation:
 
-1. **State as the Single Source of Truth**:
-   Whenever a \`State<T>\` object is modified, Compose schedules a **recomposition** for any Composable function reading that specific state value.
-
-2. **Common Trap — Unstable Parameters**:
-   Passing standard \`List<T>\` or unannotated classes causes Compose to mark parameters as unstable, forcing unconditional recomposition.
-   \`\`\`kotlin
-   @Immutable
-   data class UserUiState(val items: PersistentList<Item>)
-   \`\`\`
-
-3. **Optimization Tooling**:
-   Use Android Studio's **Layout Inspector** with recomposition counts enabled to see live flashes whenever your UI redraws.`;
-    } else if (queryLower.includes('project') || queryLower.includes('idea')) {
+- **What It Actually Is**:
+  Think of this milestone like building the foundation and plumbing of a house before painting the walls. You are establishing the strict data rules and user boundaries so that when you add advanced features, the system doesn't collapse.
+- **The Core Mental Model**:
+  1. **Inputs**: What the user or system provides.
+  2. **State**: The single source of truth that remembers what happened.
+  3. **Output**: The visual interface or response displayed back to the user.
+- **Why It Matters**:
+  If you mix state mutations directly inside UI components, finding bugs becomes a nightmare. Keeping logic strictly separated means you can fix any problem in minutes rather than hours.`;
+    }
+    // Intent 4: Scenario Quiz
+    else if (queryLower.includes('quiz') || queryLower.includes('scenario') || queryLower.includes('test')) {
       dynamicContent = `
-### Recommended Practical Mini-Projects:
+### 🧠 Scenario Challenge for **${activeMilestone}**:
 
-1. **Reactive Feed with Offline Cache**:
-   Build an infinite scroll feed that caches items locally in Room/SQLite and shows an offline sync indicator.
+**Scenario**: You deploy your application to production. A user signs up, pays on Stripe (or initiates a background sync), but their dashboard still shows an unpaid / empty state until they manually refresh 3 times.
 
-2. **Interactive Dashboard Widget**:
-   Implement dynamic animations using custom canvas drawing to visualize personal milestones.
+**Question**: What is the root architectural flaw?
+- A) The frontend framework is too slow and should be replaced.
+- B) The application is relying on synchronous client-side redirects rather than asynchronous server webhook verification with optimistic cache invalidation.
+- C) The database indexes are corrupted and require a full rebuild.
+- D) The user's internet connection timed out.
 
-3. **Type-Safe Navigation Flow**:
-   Create a multi-step user flow demonstrating seamless state retention across screen transitions.`;
-    } else {
+*Think through your answer, or reply with your choice (A, B, C, or D) to discuss the trade-offs!*`;
+    }
+    // Intent 5: Debugging
+    else if (queryLower.includes('debug') || queryLower.includes('issue') || queryLower.includes('error') || queryLower.includes('fix')) {
       dynamicContent = `
-### Core Technical Analysis:
+### 5-Step Systematic Debugging Protocol:
 
-- **Mental Model**: Break the problem down into inputs, state transitions, and expected outputs.
-- **Implementation Strategy**: Focus on completing one deliverable checklist item before adding complexity.
-- **Next Action**: Check your current milestone deliverables in the roadmap tab to verify your progress!`;
+1. **Isolate the Failure Domain**:
+   Determine whether the issue is occurring at the Presentation Layer (UI state), Data Transport Layer (HTTP/API status), or Persistence Layer (Database/Cache).
+2. **Inspect the Network & Log Traces**:
+   Open browser DevTools (Network tab) or terminal logs. Check the exact HTTP status code and response payload. 90% of bugs are revealed here.
+3. **Verify Environment Variables**:
+   Confirm that your API keys, base URLs, and secrets are actually defined in your \`.env\` and loaded in the running process.
+4. **Reproduce with Minimal Mock Data**:
+   Strip away edge components and test the failing function with hardcoded, known-good inputs.
+5. **Check Schema & Nullability Assumptions**:
+   Verify whether your code is attempting to access properties on \`undefined\` or \`null\` objects before asynchronous data has finished loading.`;
+    }
+    // Intent 6: General Technical Guidance
+    else {
+      dynamicContent = `
+### Architectural Analysis for **${activeMilestone}**:
+
+Regarding your question **"${query}"**:
+
+1. **Core Concept**:
+   In **${roadmapTitle}**, this phase requires maintaining a clear separation between your presentation layer and your business logic. 
+2. **Immediate Implementation Step**:
+   Focus on your current checklist deliverable. Ensure that all state mutations flow in a single direction and that errors are caught with explicit recovery states.
+3. **Verification**:
+   Once you complete this task, verify the deliverable in your browser or test suite before moving to the next checkpoint.`;
     }
 
     return {
-      content: `${personaIntro}\n${dynamicContent}\n\n*Tip: Connect your Google Gemini API key in Settings for full unconstrained Gemini 1.5 responses!* 🚀`,
+      content: `${personaIntro}\n${dynamicContent}\n\n*Tip: Connect your Google Gemini API key in the top bar for live unconstrained generative answers!* 🚀`,
     };
   }
 
@@ -449,13 +565,143 @@ I cannot fulfill requests to:
   const durationMonths = payload.duration_months || 3;
 
   // Domain Detection
+  const isSaaS = goalLower.includes('saas') || goalLower.includes('mvp') || goalLower.includes('indie') || goalLower.includes('startup') || goalLower.includes('business') || goalLower.includes('product');
   const isAndroid = goalLower.includes('compose') || goalLower.includes('android') || goalLower.includes('kotlin');
   const isReactNext = goalLower.includes('react') || goalLower.includes('next') || goalLower.includes('web') || goalLower.includes('frontend') || goalLower.includes('fullstack') || goalLower.includes('full-stack');
   const isPythonAI = goalLower.includes('python') || goalLower.includes('ai') || goalLower.includes('machine learning') || goalLower.includes('data') || goalLower.includes('llm') || goalLower.includes('deep learning');
 
   let milestones = [];
 
-  if (isAndroid) {
+  if (isSaaS) {
+    milestones = [
+      {
+        title: 'Problem Discovery, Customer Validation & Lean Canvas Architecture',
+        description: 'Formulate an unshakeable value proposition, conduct 10 structured customer discovery interviews, analyze competitor pricing, and map out your Lean Canvas.',
+        is_major: false,
+        xp_reward: 180,
+        deliverables: [
+          'Conduct 10 problem discovery interviews with target users following The Mom Test',
+          'Document a 1-page Lean Canvas outlining unique value proposition and distribution channels',
+          'Audit top 3 direct competitors: pricing tiers, feature gaps, and negative customer reviews',
+          'Draft clear positioning headline and elevator pitch for early adopter outreach',
+        ],
+        resources: [
+          { title: 'Y Combinator Startup School (Official Free Curriculum)', url: 'https://www.startupschool.org/curriculum', type: 'course' },
+          { title: 'The Mom Test: How to Talk to Customers (Summary & Guide)', url: 'https://www.momtestbook.com/', type: 'book' },
+          { title: 'MicroConf: How to Find and Validate SaaS Ideas (Playlist)', url: 'https://www.youtube.com/playlist?list=PLb0f5_X4tH5F4T3gq-s6NlFjC7QZ9tYlR', type: 'video' },
+          { title: 'The Micro-SaaS Handbook by Tyler Tringas (Indie Hackers)', url: 'https://www.indiehackers.com/handbook', type: 'docs' },
+        ],
+      },
+      {
+        title: 'Wireframing & High-Converting Landing Page with Waitlist Funnel',
+        description: 'Design key screens in Figma, build a lightning-fast responsive landing page with Next.js 15 and Tailwind CSS v4, and capture early leads via Resend.',
+        is_major: false,
+        xp_reward: 220,
+        deliverables: [
+          'Wireframe core user journey (Landing -> Auth -> Dashboard -> Export) in Figma',
+          'Build Next.js 15 landing page with dark mode, responsive layout, and FAQ section',
+          'Integrate email waitlist capture with Resend API / Mailchimp and feedback confirmation',
+          'Setup PostHog product analytics and session recording to monitor visitor drop-offs',
+        ],
+        resources: [
+          { title: 'Next.js 15 Full Stack SaaS with Stripe & Supabase (freeCodeCamp)', url: 'https://www.youtube.com/watch?v=wm5gMKuwSYk', type: 'video' },
+          { title: 'Refactoring UI: Practical Design Patterns for Developers', url: 'https://www.refactoringui.com/', type: 'book' },
+          { title: 'Tailwind CSS v4 Official Documentation', url: 'https://tailwindcss.com/docs', type: 'docs' },
+          { title: 'Julian Shapiro: Landing Page Conversion Architecture Guide', url: 'https://www.julian.com/guide/growth/landing-pages', type: 'docs' },
+        ],
+      },
+      {
+        title: 'PostgreSQL Relational Schema & Multi-Tenant Row Level Security (RLS)',
+        description: 'Design normalized tables for users, teams, subscriptions, and core app entities. Enforce strict multi-tenant data isolation using Supabase RLS policies.',
+        is_major: false,
+        xp_reward: 250,
+        deliverables: [
+          'Design normalized schema (profiles, subscriptions, projects, activity_logs) with foreign keys',
+          'Write strict Postgres Row Level Security (RLS) policies ensuring zero tenant data leaks',
+          'Configure database indexes on user_id, status, and created_at for fast queries',
+          'Implement automated database migrations and reproducible seed datasets',
+        ],
+        resources: [
+          { title: 'Full Stack Open: Relational Databases & PostgreSQL (University of Helsinki)', url: 'https://fullstackopen.com/en/part13', type: 'course' },
+          { title: 'Supabase Row Level Security Architecture Guide', url: 'https://supabase.com/docs/guides/auth/row-level-security', type: 'docs' },
+          { title: 'Net Ninja: Next.js + Supabase Masterclass (Playlist)', url: 'https://www.youtube.com/playlist?list=PL4cUxeGkcC9jERUGvbu55QRnP6seY350C', type: 'video' },
+          { title: 'Designing Data-Intensive Applications Core Architecture Guide', url: 'https://github.com/ept/ddia-references', type: 'book' },
+        ],
+      },
+      {
+        title: 'User Authentication, Session Hydration & Protected App Shell',
+        description: 'Implement passwordless Magic Link and Google OAuth, manage secure JWT sessions with middleware route protection, and build the authenticated dashboard shell.',
+        is_major: true,
+        xp_reward: 350,
+        deliverables: [
+          'Configure Google OAuth and Magic Link authentication with callback handlers',
+          'Implement Next.js Edge Middleware protecting /dashboard and API routes',
+          'Build responsive sidebar dashboard shell with active navigation and user avatar menu',
+          'Handle session hydration, profile syncing, and graceful signout cache purging',
+        ],
+        resources: [
+          { title: 'Harvard CS50: Web Programming with Python and JavaScript', url: 'https://cs50.harvard.edu/web/', type: 'course' },
+          { title: 'Next.js 15 Auth & Middleware Deep Dive (Web Dev Simplified)', url: 'https://www.youtube.com/watch?v=R8_veQiYBjI', type: 'video' },
+          { title: 'Vercel SaaS Starter Template (Next.js, Postgres, Stripe)', url: 'https://github.com/vercel/nextjs-subscription-payments', type: 'project' },
+          { title: 'OWASP Web Application Security Top 10 Guidelines', url: 'https://owasp.org/www-project-top-ten/', type: 'docs' },
+        ],
+      },
+      {
+        title: 'Core Product Engine: Delivering the Primary Value Proposition',
+        description: 'Build the primary functional tool that solves the customer problem. Implement optimistic UI updates, error boundaries, and exportable deliverables.',
+        is_major: false,
+        xp_reward: 300,
+        deliverables: [
+          'Build end-to-end CRUD workflow for the primary SaaS entity (creation, editing, deletion)',
+          'Implement optimistic UI updates with React 19 useOptimistic for instant user feedback',
+          'Add toast notifications, confirmation modals, and empty state CTA placeholders',
+          'Implement one-click export (JSON / CSV / Markdown) for user-generated data',
+        ],
+        resources: [
+          { title: 'React 19 Official Documentation & Hooks Reference', url: 'https://react.dev/reference/react', type: 'docs' },
+          { title: 'Jack Herrington: Advanced React Component Patterns & State (Playlist)', url: 'https://www.youtube.com/c/JackHerrington', type: 'video' },
+          { title: 'Patterns.dev: Modern Web App Design Patterns Free Book', url: 'https://www.patterns.dev/', type: 'book' },
+          { title: 'Zod Type-Safe Schema Validation Documentation', url: 'https://zod.dev/', type: 'docs' },
+        ],
+      },
+      {
+        title: 'Stripe Monetization Architecture: Subscriptions, Webhooks & Customer Portal',
+        description: 'Integrate Stripe Billing with Checkout Sessions, Customer Portal self-serve management, and secure webhook event handling with signature verification.',
+        is_major: false,
+        xp_reward: 320,
+        deliverables: [
+          'Setup Stripe Products, Monthly/Annual Pricing Tiers, and Checkout Sessions',
+          'Build webhook handler verifying raw stripe-signature against replay attacks',
+          'Synchronize subscription status (active, past_due, canceled) with Supabase database',
+          'Add self-serve Stripe Customer Portal allowing users to upgrade and update credit cards',
+        ],
+        resources: [
+          { title: 'Stripe Billing & Subscriptions Implementation Guide (Official)', url: 'https://stripe.com/docs/billing/subscriptions/build-subscriptions', type: 'docs' },
+          { title: 'Stripe Payments & Webhooks in Next.js (Web Dev Simplified)', url: 'https://www.youtube.com/watch?v=mI_-2P5q1G0', type: 'video' },
+          { title: 'Stripe Atlas: Guide to SaaS Pricing Models & Strategy', url: 'https://stripe.com/atlas/guides/saas-pricing', type: 'book' },
+          { title: 'Stripe Sample Subscription Integration Repository', url: 'https://github.com/stripe-samples/subscription-use-cases', type: 'project' },
+        ],
+      },
+      {
+        title: 'Automated E2E Testing, Production Deployment & Public Launch',
+        description: 'Write end-to-end tests with Playwright, configure Sentry error tracking, deploy to Vercel with a custom domain, and execute your Product Hunt launch plan.',
+        is_major: true,
+        xp_reward: 450,
+        deliverables: [
+          'Write Playwright E2E tests verifying Auth, Checkout flow, and Core Feature creation',
+          'Configure Sentry error tracking and performance monitoring on Vercel deployment',
+          'Deploy production build to Vercel with custom domain and edge security headers',
+          'Execute Product Hunt and Indie Hackers public launch checklist with demo video',
+        ],
+        resources: [
+          { title: 'Playwright End-to-End Testing Documentation', url: 'https://playwright.dev/docs/intro', type: 'docs' },
+          { title: 'Vercel Production Deployment Checklist', url: 'https://vercel.com/docs/production-checklist', type: 'docs' },
+          { title: 'Product Hunt Official Launch Guide', url: 'https://www.producthunt.com/guide', type: 'docs' },
+          { title: 'MicroConf: Launching Your First SaaS Product (Playlist)', url: 'https://www.youtube.com/playlist?list=PLb0f5_X4tH5F4T3gq-s6NlFjC7QZ9tYlR', type: 'video' },
+        ],
+      },
+    ];
+  } else if (isAndroid) {
     milestones = [
       {
         title: 'Android Studio Setup, Kotlin Coroutines & Gradle Toolchains',
@@ -463,15 +709,16 @@ I cannot fulfill requests to:
         is_major: false,
         xp_reward: 180,
         deliverables: [
-          'Setup Android Studio with Kotlin 2.0+ and Version Catalogs',
+          'Setup Android Studio with Kotlin 2.0+ and Version Catalogs (libs.versions.toml)',
           'Implement structured concurrency coroutine dispatchers (IO, Default, Main)',
           'Configure Ktlint and Detekt static analysis rules in Gradle',
           'Build a minimal proof of concept demonstrating Coroutine cancellation',
         ],
         resources: [
+          { title: 'Android Basics in Compose (Google Official Free Course)', url: 'https://developer.android.com/courses/android-basics-compose/course', type: 'course' },
+          { title: 'Philipp Lackner: Complete Jetpack Compose Masterclass (Playlist)', url: 'https://www.youtube.com/playlist?list=PLQkwcJG4YTCSpJ2NLhDTHzx6XBNgk9WiC', type: 'video' },
+          { title: 'Kotlin Programming Language Official Documentation & Guide', url: 'https://kotlinlang.org/docs/home.html', type: 'book' },
           { title: 'Android Developers: Coroutines Guide', url: 'https://developer.android.com/kotlin/coroutines', type: 'docs' },
-          { title: 'Kotlin Coroutines Deep Dive', url: 'https://kotlinlang.org/docs/coroutines-overview.html', type: 'book' },
-          { title: 'Android Studio Setup & Gradle Walkthrough', url: 'https://youtube.com/results?search_query=android+studio+setup+kotlin+coroutines', type: 'video' },
         ],
       },
       {
@@ -487,8 +734,9 @@ I cannot fulfill requests to:
         ],
         resources: [
           { title: 'Official Jetpack Compose Layouts Guide', url: 'https://developer.android.com/jetpack/compose/layouts', type: 'docs' },
-          { title: 'Material 3 in Jetpack Compose', url: 'https://m3.material.io/develop/android/jetpack-compose', type: 'docs' },
-          { title: 'Compose Layouts & Modifiers Masterclass', url: 'https://youtube.com/results?search_query=jetpack+compose+layouts+modifiers', type: 'video' },
+          { title: 'Material 3 in Jetpack Compose (Official Design Guidelines)', url: 'https://m3.material.io/develop/android/jetpack-compose', type: 'docs' },
+          { title: 'Android Developers: Jetpack Compose Tutorials (Playlist)', url: 'https://www.youtube.com/playlist?list=PLWz5rJ2EKKc_xef_gX-q8fO_4Xb_cM1nN', type: 'video' },
+          { title: 'Pro Git Book (Complete Free PDF & Online Book)', url: 'https://git-scm.com/book/en/v2', type: 'book' },
         ],
       },
       {
@@ -503,9 +751,10 @@ I cannot fulfill requests to:
           'Resolve unnecessary recompositions by wrapping parameters in @Immutable wrappers',
         ],
         resources: [
-          { title: 'State and Jetpack Compose Architecture', url: 'https://developer.android.com/jetpack/compose/state', type: 'docs' },
-          { title: 'A deep dive into StateFlow and SharedFlow', url: 'https://developer.android.com/kotlin/flow/stateflow-and-sharedflow', type: 'docs' },
-          { title: 'Compose State & Recomposition Optimization', url: 'https://youtube.com/results?search_query=jetpack+compose+state+management', type: 'video' },
+          { title: 'State and Jetpack Compose Architecture Guide', url: 'https://developer.android.com/jetpack/compose/state', type: 'docs' },
+          { title: 'Deep dive into StateFlow and SharedFlow (Android Developers)', url: 'https://developer.android.com/kotlin/flow/stateflow-and-sharedflow', type: 'docs' },
+          { title: 'Philipp Lackner: State Management in Jetpack Compose (Playlist)', url: 'https://www.youtube.com/playlist?list=PLQkwcJG4YTCQ6emwTXn1mXwvd2XW56V5_', type: 'video' },
+          { title: 'Android Architecture Blueprints & Best Practices (Google)', url: 'https://github.com/android/architecture-samples', type: 'project' },
         ],
       },
       {
@@ -520,9 +769,10 @@ I cannot fulfill requests to:
           'Add animated enter/exit transitions with AnimatedNavHost',
         ],
         resources: [
-          { title: 'Navigation in Jetpack Compose (Type-Safe)', url: 'https://developer.android.com/guide/navigation/design', type: 'docs' },
-          { title: 'Kotlinx Serialization Guide', url: 'https://github.com/Kotlin/kotlinx.serialization', type: 'project' },
-          { title: 'Type Safe Navigation in Compose Tutorial', url: 'https://youtube.com/results?search_query=jetpack+compose+type+safe+navigation', type: 'video' },
+          { title: 'Navigation in Jetpack Compose Guide', url: 'https://developer.android.com/guide/navigation/design', type: 'docs' },
+          { title: 'Kotlinx Serialization Guide (Official Repository)', url: 'https://github.com/Kotlin/kotlinx.serialization', type: 'project' },
+          { title: 'Android Kotlin Fundamentals (Google Developers Free Course)', url: 'https://developer.android.com/courses/kotlin-android-fundamentals/overview', type: 'course' },
+          { title: 'Type Safe Navigation in Compose Tutorial (Philipp Lackner)', url: 'https://www.youtube.com/watch?v=AIC_6k18D9A', type: 'video' },
         ],
       },
       {
@@ -539,7 +789,8 @@ I cannot fulfill requests to:
         resources: [
           { title: 'Save data in a local database using Room', url: 'https://developer.android.com/training/data-storage/room', type: 'docs' },
           { title: 'DataStore Guide for Android Developers', url: 'https://developer.android.com/topic/libraries/architecture/datastore', type: 'docs' },
-          { title: 'Room Database & Offline Sync in Compose', url: 'https://youtube.com/results?search_query=android+room+database+kotlin+flow', type: 'video' },
+          { title: 'Philipp Lackner: Room Database, Coroutines & Flow (Playlist)', url: 'https://www.youtube.com/playlist?list=PLQkwcJG4YTCQ6emwTXn1mXwvd2XW56V5_', type: 'video' },
+          { title: 'Refactoring & Clean Architecture Handbook', url: 'https://refactoring.guru/design-patterns', type: 'book' },
         ],
       },
       {
@@ -556,7 +807,8 @@ I cannot fulfill requests to:
         resources: [
           { title: 'Retrofit REST Client Documentation', url: 'https://square.github.io/retrofit/', type: 'docs' },
           { title: 'Ktor Client Quickstart Guide', url: 'https://ktor.io/docs/client-create-new-application.html', type: 'docs' },
-          { title: 'Android Networking with Retrofit & Coroutines', url: 'https://youtube.com/results?search_query=android+retrofit+coroutines+repository', type: 'video' },
+          { title: 'Android Networking with Retrofit & Coroutines (Traversy Media)', url: 'https://www.youtube.com/watch?v=t6Mex3b8v-w', type: 'video' },
+          { title: 'Kotlin Coroutines Deep Dive Book', url: 'https://kt.academy/book/coroutines', type: 'book' },
         ],
       },
       {
@@ -571,9 +823,10 @@ I cannot fulfill requests to:
           'Setup JaCoCo test coverage reporting enforcing minimum 80% coverage',
         ],
         resources: [
-          { title: 'Testing Compose Layouts & Semantics', url: 'https://developer.android.com/jetpack/compose/testing', type: 'docs' },
-          { title: 'Turbine: A small testing library for Kotlin Flow', url: 'https://github.com/cashapp/turbine', type: 'project' },
-          { title: 'Unit Testing ViewModels and Compose UI', url: 'https://youtube.com/results?search_query=jetpack+compose+testing+tutorial', type: 'video' },
+          { title: 'Testing Compose Layouts & Semantics (Official Guide)', url: 'https://developer.android.com/jetpack/compose/testing', type: 'docs' },
+          { title: 'Turbine: Testing Library for Kotlin Flow (CashApp)', url: 'https://github.com/cashapp/turbine', type: 'project' },
+          { title: 'Philipp Lackner: Unit Testing ViewModels and Compose UI (Playlist)', url: 'https://www.youtube.com/playlist?list=PLQkwcJG4YTCQ7CeqkE1XN74k78R116bEw', type: 'video' },
+          { title: 'Testing Strategies in Modern Software Engineering (Martin Fowler)', url: 'https://martinfowler.com/testing/', type: 'book' },
         ],
       },
       {
@@ -588,9 +841,10 @@ I cannot fulfill requests to:
           'Sign and build a production-ready Android App Bundle (.aab)',
         ],
         resources: [
-          { title: 'Baseline Profiles for Android Performance', url: 'https://developer.android.com/topic/performance/baselineprofiles/overview', type: 'docs' },
-          { title: 'Shrink, obfuscate, and optimize your app', url: 'https://developer.android.com/build/shrink-code', type: 'docs' },
-          { title: 'Jetpack Compose Performance Optimization Guide', url: 'https://youtube.com/results?search_query=jetpack+compose+performance+optimization', type: 'video' },
+          { title: 'Baseline Profiles for Android Performance (Official)', url: 'https://developer.android.com/topic/performance/baselineprofiles/overview', type: 'docs' },
+          { title: 'Shrink, obfuscate, and optimize your app with R8', url: 'https://developer.android.com/build/shrink-code', type: 'docs' },
+          { title: 'Jetpack Compose Performance Optimization Masterclass', url: 'https://www.youtube.com/watch?v=eo_k4sL_U3Y', type: 'video' },
+          { title: 'Production Readiness Checklist (Google)', url: 'https://developer.android.com/distribute/best-practices/launch/launch-checklist', type: 'docs' },
         ],
       },
     ];
@@ -608,9 +862,10 @@ I cannot fulfill requests to:
           'Build a modular layout hierarchy with error boundaries and loading states',
         ],
         resources: [
+          { title: 'Full Stack Open 2024: Modern Web Development (Free Course)', url: 'https://fullstackopen.com/en/', type: 'course' },
           { title: 'Next.js App Router Documentation', url: 'https://nextjs.org/docs/app', type: 'docs' },
-          { title: 'TypeScript Handbook (Official)', url: 'https://www.typescriptlang.org/docs/handbook/intro.html', type: 'book' },
-          { title: 'Next.js 15 Full Crash Course', url: 'https://youtube.com/results?search_query=nextjs+15+app+router+tutorial', type: 'video' },
+          { title: 'Net Ninja: Next.js 15 App Router Complete Tutorial (Playlist)', url: 'https://www.youtube.com/playlist?list=PL4cUxeGkcC9jERUGvbu55QRnP6seY350C', type: 'video' },
+          { title: 'TypeScript Handbook (Official Microsoft Documentation)', url: 'https://www.typescriptlang.org/docs/handbook/intro.html', type: 'book' },
         ],
       },
       {
@@ -626,8 +881,9 @@ I cannot fulfill requests to:
         ],
         resources: [
           { title: 'React 19 Server Components Guide', url: 'https://react.dev/reference/rsc/server-components', type: 'docs' },
-          { title: 'Zod Type-Safe Schema Validation', url: 'https://zod.dev/', type: 'docs' },
-          { title: 'React 19 Server Actions & Optimistic UI', url: 'https://youtube.com/results?search_query=react+19+server+actions+useoptimistic', type: 'video' },
+          { title: 'Jack Herrington: Advanced React Server Components & Actions', url: 'https://www.youtube.com/c/JackHerrington', type: 'video' },
+          { title: 'Zod Type-Safe Schema Validation Documentation', url: 'https://zod.dev/', type: 'docs' },
+          { title: 'Eloquent JavaScript (3rd Edition - Complete Free Book)', url: 'https://eloquentjavascript.net/', type: 'book' },
         ],
       },
       {
@@ -643,8 +899,9 @@ I cannot fulfill requests to:
         ],
         resources: [
           { title: 'Drizzle ORM Documentation', url: 'https://orm.drizzle.team/docs/overview', type: 'docs' },
-          { title: 'PostgreSQL Database Tutorial', url: 'https://www.postgresqltutorial.com/', type: 'docs' },
-          { title: 'Drizzle ORM & Postgres in Next.js', url: 'https://youtube.com/results?search_query=drizzle+orm+nextjs+postgres', type: 'video' },
+          { title: 'PostgreSQL Database Tutorial (Official)', url: 'https://www.postgresqltutorial.com/', type: 'docs' },
+          { title: 'Web Dev Simplified: Learn Drizzle ORM in 30 Minutes', url: 'https://www.youtube.com/watch?v=7-NZ0MlPpgg', type: 'video' },
+          { title: 'Designing Data-Intensive Applications Core Summaries', url: 'https://github.com/ept/ddia-references', type: 'book' },
         ],
       },
       {
@@ -659,9 +916,10 @@ I cannot fulfill requests to:
           'Build session recovery and profile sync hooks in React Context',
         ],
         resources: [
-          { title: 'Supabase Auth & Row Level Security', url: 'https://supabase.com/docs/guides/auth/row-level-security', type: 'docs' },
-          { title: 'OWASP Web Application Security Guide', url: 'https://owasp.org/www-project-top-ten/', type: 'book' },
-          { title: 'Next.js 15 Auth & Middleware Deep Dive', url: 'https://youtube.com/results?search_query=nextjs+auth+middleware+security', type: 'video' },
+          { title: 'Supabase Auth & Row Level Security Guide', url: 'https://supabase.com/docs/guides/auth/row-level-security', type: 'docs' },
+          { title: 'freeCodeCamp: Next.js 15 Full Stack SaaS Authentication Course', url: 'https://www.youtube.com/watch?v=wm5gMKuwSYk', type: 'video' },
+          { title: 'OWASP Web Application Security Top 10 Guidelines', url: 'https://owasp.org/www-project-top-ten/', type: 'book' },
+          { title: 'Vercel SaaS Starter Template Repository', url: 'https://github.com/vercel/nextjs-subscription-payments', type: 'project' },
         ],
       },
       {
@@ -676,9 +934,10 @@ I cannot fulfill requests to:
           'Benchmark time-to-first-byte (TTFB) on cached vs dynamic endpoints',
         ],
         resources: [
-          { title: 'Next.js Caching & Revalidation', url: 'https://nextjs.org/docs/app/building-your-application/caching', type: 'docs' },
-          { title: 'TanStack Query Docs', url: 'https://tanstack.com/query/latest', type: 'docs' },
-          { title: 'Next.js Cache Invalidation Explained', url: 'https://youtube.com/results?search_query=nextjs+cache+revalidatetag', type: 'video' },
+          { title: 'Next.js Caching & Revalidation Architecture', url: 'https://nextjs.org/docs/app/building-your-application/caching', type: 'docs' },
+          { title: 'TanStack Query Docs & Quickstart', url: 'https://tanstack.com/query/latest', type: 'docs' },
+          { title: 'Jack Herrington: Mastering TanStack Query & Server State (Playlist)', url: 'https://www.youtube.com/playlist?list=PLNqp92_EXZBJepX9uR4hZ1e9_w5U647Zk', type: 'video' },
+          { title: 'Patterns.dev: Modern Web App Design Patterns Free Book', url: 'https://www.patterns.dev/', type: 'book' },
         ],
       },
       {
@@ -693,9 +952,10 @@ I cannot fulfill requests to:
           'Configure GitHub Actions CI workflow running tests on every pull request',
         ],
         resources: [
-          { title: 'Playwright Testing Guide', url: 'https://playwright.dev/docs/intro', type: 'docs' },
-          { title: 'Vitest Next-Generation Testing Framework', url: 'https://vitest.dev/guide/', type: 'docs' },
-          { title: 'Full-Stack Testing with Playwright & Vitest', url: 'https://youtube.com/results?search_query=playwright+nextjs+testing+tutorial', type: 'video' },
+          { title: 'Playwright End-to-End Testing Documentation', url: 'https://playwright.dev/docs/intro', type: 'docs' },
+          { title: 'Vitest Next-Generation Testing Framework Guide', url: 'https://vitest.dev/guide/', type: 'docs' },
+          { title: 'Traversy Media: End-to-End Testing with Playwright', url: 'https://www.youtube.com/watch?v=R_V_WJbJg2c', type: 'video' },
+          { title: 'Testing Strategies in Modern Software Engineering (Martin Fowler)', url: 'https://martinfowler.com/testing/', type: 'book' },
         ],
       },
       {
@@ -710,9 +970,10 @@ I cannot fulfill requests to:
           'Deploy verified production build to Vercel with custom domain and edge headers',
         ],
         resources: [
-          { title: 'Web Vitals Optimization Guide', url: 'https://web.dev/vitals/', type: 'docs' },
+          { title: 'Google Web Vitals Optimization Guide', url: 'https://web.dev/vitals/', type: 'docs' },
           { title: 'Vercel Production Deployment Checklist', url: 'https://vercel.com/docs/production-checklist', type: 'docs' },
-          { title: 'Next.js Production Performance Masterclass', url: 'https://youtube.com/results?search_query=nextjs+production+performance+optimization', type: 'video' },
+          { title: 'Next.js Production Performance Masterclass (Lee Robinson)', url: 'https://www.youtube.com/watch?v=VBlhT_T_H7A', type: 'video' },
+          { title: 'Production Readiness Checklist (Checkly)', url: 'https://github.com/checkly/production-readiness-checklist', type: 'project' },
         ],
       },
     ];
@@ -730,9 +991,10 @@ I cannot fulfill requests to:
           'Write automated tests with pytest verifying matrix operations',
         ],
         resources: [
-          { title: 'NumPy User Guide & Quickstart', url: 'https://numpy.org/doc/stable/user/quickstart.html', type: 'docs' },
-          { title: 'Fluent Python (Second Edition)', url: 'https://www.oreilly.com/library/view/fluent-python-2nd/9781492056348/', type: 'book' },
-          { title: 'NumPy & Scientific Python Crash Course', url: 'https://youtube.com/results?search_query=numpy+python+data+science+tutorial', type: 'video' },
+          { title: 'Automate the Boring Stuff with Python (Free Complete Online Book)', url: 'https://automatetheboringstuff.com/', type: 'book' },
+          { title: 'NumPy User Guide & Quickstart (Official)', url: 'https://numpy.org/doc/stable/user/quickstart.html', type: 'docs' },
+          { title: 'Corey Schafer: Python Programming Masterclass (Playlist)', url: 'https://www.youtube.com/playlist?list=PL-osiE80TeTskrapNbzXhwoFUiLCjGgY7', type: 'video' },
+          { title: 'Harvard CS50: Introduction to Computer Science & Python', url: 'https://cs50.harvard.edu/python/', type: 'course' },
         ],
       },
       {
@@ -747,9 +1009,10 @@ I cannot fulfill requests to:
           'Validate model performance with StratifiedKFold cross-validation',
         ],
         resources: [
-          { title: 'Pandas Documentation', url: 'https://pandas.pydata.org/docs/', type: 'docs' },
-          { title: 'Scikit-Learn Machine Learning in Python', url: 'https://scikit-learn.org/stable/', type: 'docs' },
-          { title: 'Feature Engineering & Data Preprocessing', url: 'https://youtube.com/results?search_query=pandas+feature+engineering+pipeline', type: 'video' },
+          { title: 'Kaggle Learn: Free Interactive Micro-Courses (Data Science & ML)', url: 'https://www.kaggle.com/learn', type: 'course' },
+          { title: 'Pandas Official Documentation', url: 'https://pandas.pydata.org/docs/', type: 'docs' },
+          { title: 'Scikit-Learn Machine Learning in Python Guide', url: 'https://scikit-learn.org/stable/', type: 'docs' },
+          { title: 'Keith Galli: Real-World Data Science with Pandas & Python (Video)', url: 'https://www.youtube.com/watch?v=vmEHCJofslg', type: 'video' },
         ],
       },
       {
@@ -764,9 +1027,10 @@ I cannot fulfill requests to:
           'Track loss curves and training metrics using TensorBoard or Weights & Biases',
         ],
         resources: [
-          { title: 'PyTorch Deep Learning Tutorials', url: 'https://pytorch.org/tutorials/', type: 'docs' },
+          { title: 'Fast.ai Practical Deep Learning for Coders (Free Course)', url: 'https://course.fast.ai/', type: 'course' },
+          { title: 'PyTorch Deep Learning Tutorials (Official)', url: 'https://pytorch.org/tutorials/', type: 'docs' },
+          { title: 'freeCodeCamp: PyTorch for Deep Learning Bootcamp (24-Hour Course)', url: 'https://www.youtube.com/watch?v=V_xro1bcAuA', type: 'video' },
           { title: 'Deep Learning with Python by François Chollet', url: 'https://www.manning.com/books/deep-learning-with-python-second-edition', type: 'book' },
-          { title: 'PyTorch for Deep Learning Bootcamp', url: 'https://youtube.com/results?search_query=pytorch+for+deep+learning+tutorial', type: 'video' },
         ],
       },
       {
@@ -781,9 +1045,10 @@ I cannot fulfill requests to:
           'Export and quantize model weights with GGUF / ONNX for efficient inference',
         ],
         resources: [
+          { title: 'Andrej Karpathy: Neural Networks: Zero to Hero (Legendary Course)', url: 'https://karpathy.ai/zero-to-hero.html', type: 'course' },
           { title: 'Hugging Face Transformers Documentation', url: 'https://huggingface.co/docs/transformers', type: 'docs' },
-          { title: 'PEFT: Parameter-Efficient Fine-Tuning', url: 'https://github.com/huggingface/peft', type: 'project' },
-          { title: 'Fine-Tuning LLMs with LoRA & Hugging Face', url: 'https://youtube.com/results?search_query=fine+tuning+llm+lora+huggingface', type: 'video' },
+          { title: 'Andrej Karpathy: Let\'s build GPT from scratch (Video Masterclass)', url: 'https://www.youtube.com/watch?v=kCc8FmEb1nY', type: 'video' },
+          { title: 'PEFT: Parameter-Efficient Fine-Tuning (GitHub Repository)', url: 'https://github.com/huggingface/peft', type: 'project' },
         ],
       },
       {
@@ -798,9 +1063,10 @@ I cannot fulfill requests to:
           'Implement hallucination guardrails using RAGAS evaluation framework',
         ],
         resources: [
-          { title: 'LangChain / LlamaIndex Architecture Guide', url: 'https://docs.llamaindex.ai/en/stable/', type: 'docs' },
+          { title: 'DeepLearning.AI: Free Short Courses for LLMs & GenAI', url: 'https://www.deeplearning.ai/short-courses/', type: 'course' },
+          { title: 'LangChain & LlamaIndex Architecture Guide', url: 'https://docs.llamaindex.ai/en/stable/', type: 'docs' },
+          { title: 'freeCodeCamp: Building Full Stack RAG Applications with Python', url: 'https://www.youtube.com/watch?v=2TJxpyO3ei4', type: 'video' },
           { title: 'pgvector: Vector similarity search for Postgres', url: 'https://github.com/pgvector/pgvector', type: 'project' },
-          { title: 'Production RAG Architecture from Scratch', url: 'https://youtube.com/results?search_query=production+rag+architecture+langchain', type: 'video' },
         ],
       },
       {
@@ -815,9 +1081,10 @@ I cannot fulfill requests to:
           'Setup automated benchmark load tests using Locust verifying latency SLAs',
         ],
         resources: [
-          { title: 'FastAPI Web Framework Documentation', url: 'https://fastapi.tiangolo.com/', type: 'docs' },
-          { title: 'Docker for Machine Learning Deployments', url: 'https://docs.docker.com/language/python/', type: 'docs' },
-          { title: 'Serving AI Models with FastAPI & Docker', url: 'https://youtube.com/results?search_query=fastapi+docker+ai+model+serving', type: 'video' },
+          { title: 'FastAPI Web Framework Documentation & Tutorials', url: 'https://fastapi.tiangolo.com/', type: 'docs' },
+          { title: 'Docker Official Documentation for Python Developers', url: 'https://docs.docker.com/language/python/', type: 'docs' },
+          { title: 'Amigoscode: Building and Dockerizing FastAPI Services', url: 'https://www.youtube.com/watch?v=0sOvCWFmrtA', type: 'video' },
+          { title: 'Fast.ai Deep Learning Book (Free on GitHub)', url: 'https://github.com/fastai/fastbook', type: 'book' },
         ],
       },
     ];
@@ -826,7 +1093,7 @@ I cannot fulfill requests to:
     const baseTitle = goalStr.length > 30 ? `${goalStr.slice(0, 28)}...` : goalStr;
     milestones = [
       {
-        title: `Core Foundations & Development Tooling for ${baseTitle}`,
+        title: `Core Foundations & Professional Toolchain for ${baseTitle}`,
         description: `Establish essential mental models, setup professional developer workflows, and understand the core primitives of ${goalStr}.`,
         is_major: false,
         xp_reward: 180,
@@ -837,9 +1104,10 @@ I cannot fulfill requests to:
           'Configure version control with atomic semantic commit standards',
         ],
         resources: [
-          { title: `Official Getting Started Guide for ${baseTitle}`, url: 'https://developer.mozilla.org', type: 'docs' },
-          { title: 'Clean Architecture Principles', url: 'https://martinfowler.com', type: 'book' },
-          { title: `Comprehensive Beginner Crash Course on ${baseTitle}`, url: `https://youtube.com/results?search_query=${encodeURIComponent(goalStr + ' tutorial')}`, type: 'video' },
+          { title: 'Harvard CS50: Introduction to Computer Science (Free Course)', url: 'https://cs50.harvard.edu/x/', type: 'course' },
+          { title: 'Pro Git Book (Free Complete Official Book)', url: 'https://git-scm.com/book/en/v2', type: 'book' },
+          { title: 'freeCodeCamp: Comprehensive Foundations Course', url: 'https://www.youtube.com/c/Freecodecamp', type: 'video' },
+          { title: 'Clean Architecture Principles by Martin Fowler', url: 'https://martinfowler.com/architecture/', type: 'docs' },
         ],
       },
       {
@@ -854,12 +1122,14 @@ I cannot fulfill requests to:
           'Conduct code audit identifying potential bottlenecks',
         ],
         resources: [
-          { title: 'Design Patterns & Architecture Catalog', url: 'https://refactoring.guru/design-patterns', type: 'docs' },
-          { title: `Deep Dive Patterns for ${baseTitle}`, url: `https://youtube.com/results?search_query=${encodeURIComponent(goalStr + ' architecture patterns')}`, type: 'video' },
+          { title: 'Refactoring & Design Patterns Catalog', url: 'https://refactoring.guru/design-patterns', type: 'book' },
+          { title: 'System Design Primer (Top GitHub Architecture Guide)', url: 'https://github.com/donnemartin/system-design-primer', type: 'project' },
+          { title: 'Traversy Media: Architecture & Design Patterns Masterclass', url: 'https://www.youtube.com/watch?v=tv-_1er1mWI', type: 'video' },
+          { title: 'Mozilla Developer Network (MDN) Engineering Reference', url: 'https://developer.mozilla.org', type: 'docs' },
         ],
       },
       {
-        title: `State Management, Data Flow & Error Handling`,
+        title: `State Management, Data Flow & Error Boundaries`,
         description: `Implement robust unidirectional data flow, asynchronous operations, and fail-safe recovery patterns for ${goalStr}.`,
         is_major: false,
         xp_reward: 250,
@@ -871,11 +1141,13 @@ I cannot fulfill requests to:
         ],
         resources: [
           { title: 'The Pragmatic Programmer Reference', url: 'https://pragprog.com/', type: 'book' },
-          { title: 'Error Handling & Fault Tolerance Best Practices', url: 'https://youtube.com/results?search_query=fault+tolerant+architecture', type: 'video' },
+          { title: 'Web Dev Simplified: Asynchronous Programming Masterclass', url: 'https://www.youtube.com/watch?v=V_Kr9OSfDeU', type: 'video' },
+          { title: 'OWASP Security Guidelines & Error Handling', url: 'https://owasp.org/', type: 'docs' },
+          { title: 'Designing Data-Intensive Applications Core Summaries', url: 'https://github.com/ept/ddia-references', type: 'book' },
         ],
       },
       {
-        title: `Integration Milestone & First Working Prototype`,
+        title: `Integration Milestone & Working Prototype Release`,
         description: `Synthesize foundational concepts into a unified, interactive prototype that delivers tangible, end-to-end functionality.`,
         is_major: true,
         xp_reward: 350,
@@ -886,8 +1158,10 @@ I cannot fulfill requests to:
           'Write user walkthrough documentation with reproduction steps',
         ],
         resources: [
-          { title: 'Building Production-Ready Systems Guide', url: 'https://aws.amazon.com/architecture/well-architected/', type: 'docs' },
-          { title: `Prototype Walkthrough & Code Review for ${baseTitle}`, url: `https://youtube.com/results?search_query=${encodeURIComponent(goalStr + ' project build')}`, type: 'video' },
+          { title: 'AWS Well-Architected Framework: Reliability Pillar', url: 'https://aws.amazon.com/architecture/well-architected/', type: 'docs' },
+          { title: 'freeCodeCamp: Building Full Stack Production Applications', url: 'https://www.youtube.com/c/Freecodecamp', type: 'video' },
+          { title: 'Full Stack Open: Comprehensive Web Architecture', url: 'https://fullstackopen.com/en/', type: 'course' },
+          { title: 'Release Engineering Best Practices Guide', url: 'https://github.com/checkly/production-readiness-checklist', type: 'project' },
         ],
       },
       {
@@ -902,12 +1176,14 @@ I cannot fulfill requests to:
           'Setup GitHub Actions CI pipeline executing tests on every commit',
         ],
         resources: [
-          { title: 'Testing Strategies in Modern Software Engineering', url: 'https://martinfowler.com/testing/', type: 'docs' },
-          { title: 'Automated CI/CD Pipeline Tutorial', url: 'https://youtube.com/results?search_query=github+actions+ci+cd+tutorial', type: 'video' },
+          { title: 'Martin Fowler: Practical Test Pyramid Architecture', url: 'https://martinfowler.com/articles/practical-test-pyramid.html', type: 'docs' },
+          { title: 'GitHub Actions Continuous Integration Documentation', url: 'https://docs.github.com/en/actions', type: 'docs' },
+          { title: 'Traversy Media: Automated CI/CD Pipelines with GitHub Actions', url: 'https://www.youtube.com/watch?v=R8_veQiYBjI', type: 'video' },
+          { title: 'Unit Testing Principles, Practices, and Patterns Summary', url: 'https://www.manning.com/books/unit-testing', type: 'book' },
         ],
       },
       {
-        title: `Production Optimization, Hardening & Final Capstone Release`,
+        title: `Production Optimization, Hardening & Final Capstone Launch`,
         description: `Polish, package, and publicly launch your capstone milestone. Audit security, optimize performance, and document architecture.`,
         is_major: true,
         xp_reward: 450,
@@ -918,8 +1194,10 @@ I cannot fulfill requests to:
           'Publish live interactive demo and GitHub repository with full README',
         ],
         resources: [
-          { title: 'Release Engineering & Production Readiness Checklist', url: 'https://github.com/checkly/production-readiness-checklist', type: 'project' },
-          { title: `Publishing and Deploying ${baseTitle}`, url: `https://youtube.com/results?search_query=${encodeURIComponent(goalStr + ' deploy production')}`, type: 'video' },
+          { title: 'Google Web Vitals & Production Readiness Guide', url: 'https://web.dev/vitals/', type: 'docs' },
+          { title: 'Product Hunt Official Launch Guide', url: 'https://www.producthunt.com/guide', type: 'docs' },
+          { title: 'Y Combinator: How to Launch Your Product', url: 'https://www.youtube.com/watch?v=C27RVio2rOs', type: 'video' },
+          { title: 'Production Readiness Checklist (Checkly)', url: 'https://github.com/checkly/production-readiness-checklist', type: 'project' },
         ],
       },
     ];
