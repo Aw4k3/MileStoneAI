@@ -7,12 +7,17 @@ import {
   ArrowRight,
   ArrowLeft,
   Target,
-  Brain,
   Sliders,
   CheckCircle2,
   AlertTriangle,
   Zap,
   Cpu,
+  BookOpen,
+  Layers,
+  Wand2,
+  Check,
+  Calendar,
+  Clock,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Spinner from '../components/common/Spinner';
@@ -20,51 +25,22 @@ import { useRoadmaps } from '../hooks/useRoadmaps';
 import {
   generateRoadmapWithAI,
   estimateDurationWithAI,
+  suggestTitlesWithAI,
 } from '../lib/gemini';
 import {
   ROADMAP_TEMPLATES,
   PACING_OPTIONS,
   GEMINI_MODELS,
+  DIFFICULTY_LEVELS,
 } from '../lib/constants';
 
-const DIAGNOSTIC_QUESTIONS = [
-  {
-    id: 'exp',
-    question: 'How much prior experience do you have in this exact domain?',
-    options: [
-      { label: 'Complete beginner (zero background)', score: 'beginner' },
-      { label: 'Some self-taught exposure or related basics', score: 'beginner' },
-      { label: 'Intermediate (built small projects or academic foundation)', score: 'intermediate' },
-      { label: 'Advanced professional seeking mastery and architecture', score: 'advanced' },
-    ],
-  },
-  {
-    id: 'time',
-    question: 'How many dedicated hours per week can you realistically commit?',
-    options: [
-      { label: '2 to 4 hours / week (casual pacing)', pacing: 'biweekly' },
-      { label: '5 to 8 hours / week (steady progress)', pacing: 'weekly' },
-      { label: '10 to 15 hours / week (focused sprint)', pacing: 'weekly' },
-      { label: '20+ hours / week (full immersion / bootcamp mode)', pacing: 'every_3_days' },
-    ],
-  },
-  {
-    id: 'goal_type',
-    question: 'What is your primary measure of success?',
-    options: [
-      { label: 'Passing an interview or getting certified' },
-      { label: 'Shipping a tangible production-ready project' },
-      { label: 'Casual fluency and personal hobby enrichment' },
-      { label: 'Foundational comprehension of core principles' },
-    ],
-  },
-];
+const MILESTONE_COUNT_OPTIONS = [4, 6, 8, 10, 12, 16];
 
 export default function WizardPage() {
   const navigate = useNavigate();
   const { createRoadmap } = useRoadmaps();
 
-  // Wizard Step (0: Goal/Templates, 1: Diagnostic, 2: Pacing & AI Estimator, 3: Review & Generate)
+  // Wizard Step: 0 = Goal & Formal Titles, 1 = Timeline, Pacing & Blueprint Parameters
   const [step, setStep] = useState(0);
 
   // Form State
@@ -72,16 +48,19 @@ export default function WizardPage() {
   const [difficulty, setDifficulty] = useState('intermediate');
   const [durationMonths, setDurationMonths] = useState(3);
   const [pacing, setPacing] = useState('weekly');
+  const [targetMilestones, setTargetMilestones] = useState(8);
   const [geminiModel, setGeminiModel] = useState('pro');
 
-  // Diagnostic State
-  const [diagnosticAnswers, setDiagnosticAnswers] = useState({});
+  // AI Formal Title Suggestions State
+  const [suggestedTitles, setSuggestedTitles] = useState([]);
+  const [isSuggestingTitles, setIsSuggestingTitles] = useState(false);
+  const [selectedTitle, setSelectedTitle] = useState('');
 
-  // AI Duration Estimator
+  // AI Duration & Pacing Suggestion State
   const [isEstimatingDuration, setIsEstimatingDuration] = useState(false);
   const [aiDurationSuggestion, setAiDurationSuggestion] = useState(null);
 
-  // AI Generation Loading state
+  // AI Generation Loading State
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStepText, setGenerationStepText] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -89,25 +68,30 @@ export default function WizardPage() {
   // Handle template selection
   const handleSelectTemplate = (template) => {
     setGoal(template.goal);
+    setSelectedTitle(template.title);
     setDifficulty(template.difficulty);
     setDurationMonths(template.duration);
+    setSuggestedTitles([]);
   };
 
-  // Milestone frequency multiplier
-  const pacingMultiplier = {
-    daily: 30,
-    every_3_days: 10,
-    weekly: 4,
-    biweekly: 2,
-    monthly: 1,
+  // Run AI Formal Course Title Generator
+  const handleSuggestTitles = async () => {
+    if (!goal.trim()) return;
+    setIsSuggestingTitles(true);
+    setErrorMessage('');
+    try {
+      const res = await suggestTitlesWithAI({ goal: goal.trim() });
+      if (res?.titles && Array.isArray(res.titles) && res.titles.length > 0) {
+        setSuggestedTitles(res.titles);
+      }
+    } catch (err) {
+      console.warn('AI formal title suggestion notice:', err.message);
+    } finally {
+      setIsSuggestingTitles(false);
+    }
   };
 
-  const estimatedMilestones = Math.round(durationMonths * (pacingMultiplier[pacing] || 4));
-
-  // Overload guardrail: block Daily pacing on plans > 6 months
-  const isOverloadBlocked = pacing === 'daily' && durationMonths > 6;
-
-  // Run real AI Duration Estimation
+  // Run AI Duration & Pacing Estimation
   const handleEstimateDuration = async () => {
     if (!goal.trim()) return;
     setIsEstimatingDuration(true);
@@ -117,26 +101,38 @@ export default function WizardPage() {
         setAiDurationSuggestion(res);
       }
     } catch (err) {
-      console.warn('AI duration estimator notice:', err);
+      console.warn('AI duration estimator notice:', err.message);
     } finally {
       setIsEstimatingDuration(false);
     }
   };
 
-  const handleDiagnosticAnswer = (questionId, option) => {
-    setDiagnosticAnswers((prev) => ({
-      ...prev,
-      [questionId]: option,
-    }));
-
-    if (questionId === 'exp' && option.score) {
-      setDifficulty(option.score);
+  // Apply AI Duration, Pacing & Milestone Count Recommendation
+  const applyAiRecommendation = () => {
+    if (!aiDurationSuggestion) return;
+    if (aiDurationSuggestion.recommended_months) {
+      setDurationMonths(aiDurationSuggestion.recommended_months);
     }
-    if (questionId === 'time' && option.pacing) {
-      setPacing(option.pacing);
+    if (aiDurationSuggestion.recommended_pacing) {
+      setPacing(aiDurationSuggestion.recommended_pacing);
+    }
+    if (aiDurationSuggestion.recommended_milestones) {
+      setTargetMilestones(aiDurationSuggestion.recommended_milestones);
     }
   };
 
+  // Proceed to Step 1 and trigger AI timeline calibration
+  const handleContinueToStep1 = () => {
+    setStep(1);
+    if (!aiDurationSuggestion) {
+      handleEstimateDuration();
+    }
+  };
+
+  // Overload guardrail: block Daily pacing on plans > 6 months
+  const isOverloadBlocked = pacing === 'daily' && durationMonths > 6;
+
+  // Generate complete roadmap with Gemini AI
   const handleGenerate = async () => {
     setIsGenerating(true);
     setErrorMessage('');
@@ -145,47 +141,50 @@ export default function WizardPage() {
     let generatedRoadmapId = null;
 
     try {
-      // 1. Live Gemini AI Synthesis (or local AI fallback)
+      // 1. Live Gemini AI Synthesis via Supabase Proxy (or fallback engine)
       const aiData = await generateRoadmapWithAI({
         goal,
         difficulty,
         duration_months: durationMonths,
         pacing,
+        target_milestones: targetMilestones,
         gemini_model: geminiModel,
+        model: geminiModel,
       });
 
-      setGenerationStepText('Creating curriculum milestones, deliverables, and verified resources...');
+      setGenerationStepText(`Generated ${aiData?.milestones?.length || targetMilestones} comprehensive milestones with verified resources...`);
 
-      // 2. Persist using createRoadmap (Hybrid: LocalStorage + Supabase)
+      // 2. Persist using createRoadmap (Hybrid: Supabase + LocalStorage)
+      const finalTitle = selectedTitle || aiData?.title || (goal.length > 50 ? `${goal.slice(0, 48)}...` : goal);
+
       const created = await createRoadmap({
-        title: aiData?.title || (goal.length > 40 ? `${goal.slice(0, 38)}...` : goal),
+        title: finalTitle,
         goal_summary: aiData?.goal_summary || goal,
         difficulty,
         duration_months: durationMonths,
         pacing,
         key_outcomes: aiData?.key_outcomes || [
-          'Master core foundational principles and primitives',
-          'Build and test decoupled production components',
-          'Deploy verified milestone capstone deliverable',
+          'Master core foundational architecture and mental models',
+          'Build, verify, and test decoupled production deliverables',
+          'Deploy verified milestone capstones with automated testing',
         ],
         gemini_model: geminiModel,
         milestones: aiData?.milestones || [],
       });
 
       generatedRoadmapId = created?.id;
-      setGenerationStepText('Finalizing blueprint records...');
+      setGenerationStepText('Finalizing roadmap records and deliverables...');
 
       setTimeout(() => {
         setIsGenerating(false);
-        // Direct navigation to the created roadmap!
         navigate(`/roadmap/${generatedRoadmapId}`);
       }, 400);
     } catch (err) {
       console.error('Roadmap synthesis error:', err);
-      // Fallback: create emergency local blueprint so user is never stuck
+      // Emergency local fallback to ensure user is never blocked
       try {
         const fallback = await createRoadmap({
-          title: goal.length > 40 ? `${goal.slice(0, 38)}...` : goal,
+          title: selectedTitle || (goal.length > 50 ? `${goal.slice(0, 48)}...` : goal),
           goal_summary: goal,
           difficulty,
           duration_months: durationMonths,
@@ -194,16 +193,16 @@ export default function WizardPage() {
           gemini_model: geminiModel,
           milestones: [
             {
-              title: 'Phase 1: Fundamentals & Tooling',
+              title: 'Phase 1: Foundations & Tooling',
               description: 'Initial setup, mental models, and foundational syntax.',
               deliverables: ['Setup development workspace', 'Complete introductory coding exercises'],
-              resources: [{ title: 'Documentation & Guides', url: 'https://docs.github.com', type: 'docs' }],
+              resources: [{ title: 'Official Documentation', url: 'https://developer.mozilla.org', type: 'docs' }],
             },
             {
               title: 'Phase 2: Project Architecture',
               description: 'Build core application features with clean architecture.',
               deliverables: ['Implement primary domain logic', 'Write verification tests'],
-              resources: [{ title: 'Best Practice Architecture Guide', url: 'https://martinfowler.com', type: 'book' }],
+              resources: [{ title: 'Clean Architecture Guide', url: 'https://martinfowler.com', type: 'book' }],
             },
           ],
         });
@@ -221,21 +220,19 @@ export default function WizardPage() {
     <Layout>
       <div className="max-w-3xl mx-auto py-2">
         {/* Wizard Progress Bar */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-400 mb-2">
-            <span>Step {step + 1} of 4</span>
+            <span>Step {step + 1} of 2</span>
             <span>
-              {step === 0 && 'Define Your Goal'}
-              {step === 1 && 'AI Diagnostic Assessment'}
-              {step === 2 && 'Timeline & Pacing Guardrails'}
-              {step === 3 && 'Generate Roadmap'}
+              {step === 0 && 'Define Course Objective & AI Title'}
+              {step === 1 && 'Timeline, Pacing & Milestone Architecture'}
             </span>
           </div>
           <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
             <motion.div
               className="h-full bg-indigo-500 rounded-full"
-              initial={{ width: '25%' }}
-              animate={{ width: `${((step + 1) / 4) * 100}%` }}
+              initial={{ width: '50%' }}
+              animate={{ width: step === 0 ? '50%' : '100%' }}
               transition={{ duration: 0.3 }}
             />
           </div>
@@ -250,7 +247,7 @@ export default function WizardPage() {
         {/* Wizard Steps Form */}
         <div className="card p-6 sm:p-8 relative">
           <AnimatePresence mode="wait">
-            {/* STEP 0: Goal Input & Quick Templates */}
+            {/* STEP 0: Goal Input & AI Formal Course Title Generator */}
             {step === 0 && (
               <motion.div
                 key="step-0"
@@ -266,28 +263,91 @@ export default function WizardPage() {
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-400 mt-1">
                     Describe your objective in natural language. Our Gemini engine will analyze
-                    scope, pre-requisites, and target milestones.
+                    scope, pre-requisites, and synthesize production-grade milestones.
                   </p>
                 </div>
 
-                <div>
+                <div className="space-y-3">
                   <textarea
                     rows={4}
                     value={goal}
-                    onChange={(e) => setGoal(e.target.value)}
-                    placeholder="e.g. Master Jetpack Compose and Kotlin Coroutines to build clean architecture Android applications from scratch..."
+                    onChange={(e) => {
+                      setGoal(e.target.value);
+                      if (selectedTitle && !suggestedTitles.includes(selectedTitle)) {
+                        setSelectedTitle('');
+                      }
+                    }}
+                    placeholder="e.g. Master full-stack AI SaaS engineering with Next.js, Stripe subscriptions, and LangChain to build scalable web products..."
                     className="input-field resize-none text-sm leading-relaxed"
                   />
-                  <div className="flex justify-between items-center mt-2 text-xs text-slate-400">
-                    <span>Be specific about your end deliverable</span>
-                    <span>{goal.length} chars</span>
+                  <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-slate-400">
+                    <span>Be specific about your end deliverable or domain</span>
+                    <button
+                      type="button"
+                      onClick={handleSuggestTitles}
+                      disabled={!goal.trim() || isSuggestingTitles}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 text-xs font-medium transition-colors disabled:opacity-50"
+                    >
+                      {isSuggestingTitles ? (
+                        <>
+                          <Spinner size="xs" />
+                          <span>Generating Formal Titles...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Suggest Formal Titles with AI</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
 
-                {/* Templates Section */}
+                {/* AI Suggested Formal Course Titles */}
+                {suggestedTitles.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 rounded-xl bg-slate-800/40 border border-indigo-500/30 space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                        AI Formal Course Titles (Click to select)
+                      </p>
+                      <span className="text-[10px] text-slate-400">Powered by Gemini</span>
+                    </div>
+                    <div className="space-y-2">
+                      {suggestedTitles.map((title, idx) => {
+                        const isChosen = selectedTitle === title;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setSelectedTitle(title)}
+                            className={`w-full text-left p-3 rounded-lg border text-xs transition-all flex items-center justify-between gap-3 ${
+                              isChosen
+                                ? 'bg-indigo-500/20 border-indigo-500 text-indigo-100 font-semibold'
+                                : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white'
+                            }`}
+                          >
+                            <span className="truncate">{title}</span>
+                            {isChosen ? (
+                              <Check className="w-4 h-4 text-indigo-400 shrink-0" />
+                            ) : (
+                              <span className="text-[10px] text-slate-500 shrink-0">Select</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Quick Templates Section */}
                 <div className="space-y-3 pt-2">
                   <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                    <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
                     Or pick a 1-click curated blueprint
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -322,20 +382,17 @@ export default function WizardPage() {
                   <button
                     type="button"
                     disabled={!goal.trim()}
-                    onClick={() => {
-                      setStep(1);
-                      handleEstimateDuration();
-                    }}
+                    onClick={handleContinueToStep1}
                     className="btn-primary inline-flex items-center gap-2 text-sm py-2.5 px-5 disabled:opacity-50"
                   >
-                    Continue to Assessment
+                    Continue to Timeline & Milestones
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </motion.div>
             )}
 
-            {/* STEP 1: AI Diagnostic Assessment */}
+            {/* STEP 1: Timeline, Pacing, Target Milestones & Blueprint Generation */}
             {step === 1 && (
               <motion.div
                 key="step-1"
@@ -344,131 +401,106 @@ export default function WizardPage() {
                 exit={{ opacity: 0, x: -12 }}
                 className="space-y-6"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-                      <Brain className="w-5 h-5 text-indigo-400" />
-                      3-Question AI Diagnostic
-                    </h2>
-                    <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                      Helps calibrate baseline difficulty and time pacing automatically.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    className="text-xs text-slate-400 hover:text-slate-200 underline"
-                  >
-                    Skip Diagnostic
-                  </button>
-                </div>
-
-                <div className="space-y-5">
-                  {DIAGNOSTIC_QUESTIONS.map((q, idx) => (
-                    <div key={q.id} className="p-4 rounded-xl bg-slate-800/30 border border-slate-800 space-y-2.5">
-                      <p className="text-xs sm:text-sm font-semibold text-slate-200">
-                        {idx + 1}. {q.question}
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {q.options.map((opt) => {
-                          const isSelected = diagnosticAnswers[q.id]?.label === opt.label;
-                          return (
-                            <button
-                              key={opt.label}
-                              type="button"
-                              onClick={() => handleDiagnosticAnswer(q.id, opt)}
-                              className={`p-2.5 rounded-lg border text-left text-xs transition-all ${
-                                isSelected
-                                  ? 'bg-indigo-500/20 border-indigo-500 text-indigo-200 font-medium'
-                                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                              }`}
-                            >
-                              {opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Calibrated Level Notice */}
-                <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-between text-xs">
-                  <span className="text-slate-300">
-                    Calibrated Difficulty: <strong className="text-indigo-400 capitalize">{difficulty}</strong>
-                  </span>
-                  <span className="text-slate-400">Pacing: <strong className="text-indigo-400 capitalize">{pacing}</strong></span>
-                </div>
-
-                <div className="flex justify-between items-center pt-4 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setStep(0)}
-                    className="btn-secondary inline-flex items-center gap-1.5 text-xs py-2 px-4"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    className="btn-primary inline-flex items-center gap-2 text-sm py-2.5 px-5"
-                  >
-                    Continue to Configuration
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* STEP 2: Timeline, Pacing & Model Controls */}
-            {step === 2 && (
-              <motion.div
-                key="step-2"
-                initial={{ opacity: 0, x: 12 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
-                className="space-y-6"
-              >
                 <div>
                   <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
                     <Sliders className="w-5 h-5 text-indigo-400" />
-                    Pacing & Guardrails
+                    Timeline, Pacing & Milestone Architecture
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                    Fine-tune target duration, milestone frequency, and AI reasoning depth.
+                    Fine-tune course duration, milestone frequency, target milestone count, and AI reasoning depth.
                   </p>
                 </div>
 
-                {/* Timeline Selector */}
+                {/* AI Duration & Pacing Recommendation Card */}
+                {aiDurationSuggestion ? (
+                  <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                        AI Recommendation for Your Goal
+                      </span>
+                      <button
+                        type="button"
+                        onClick={applyAiRecommendation}
+                        className="px-2.5 py-1 rounded-md bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-[11px] transition-colors"
+                      >
+                        Apply AI Recommendation
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      {aiDurationSuggestion.reasoning}
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1 text-[11px]">
+                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                        Duration: <strong className="text-indigo-400">{aiDurationSuggestion.recommended_months} months</strong>
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                        Pacing: <strong className="text-indigo-400 capitalize">{aiDurationSuggestion.recommended_pacing || 'weekly'}</strong>
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                        Milestones: <strong className="text-indigo-400">{aiDurationSuggestion.recommended_milestones || 8} milestones</strong>
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-800 text-xs">
+                    <span className="text-slate-400 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      Want AI to estimate optimal pacing and duration?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleEstimateDuration}
+                      disabled={isEstimatingDuration}
+                      className="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {isEstimatingDuration ? 'Analyzing Goal...' : 'Get AI Recommendation'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Target Milestones Selector (Removes the artificial 6 milestone cap!) */}
+                <div className="space-y-2.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                      Target Milestone Count
+                    </label>
+                    <span className="text-xs font-bold text-indigo-400">{targetMilestones} Milestones</span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {MILESTONE_COUNT_OPTIONS.map((count) => {
+                      const isSelected = targetMilestones === count;
+                      return (
+                        <button
+                          key={count}
+                          type="button"
+                          onClick={() => setTargetMilestones(count)}
+                          className={`p-2.5 rounded-xl border text-center transition-all ${
+                            isSelected
+                              ? 'bg-indigo-500/20 border-indigo-500 text-indigo-200 font-bold'
+                              : 'bg-slate-800/40 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="text-sm font-semibold">{count}</div>
+                          <div className="text-[10px] text-slate-400">Milestones</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Choose between 4 for compact sprints up to 16 for production-scale masteries. Each milestone includes deliverables and verified learning resources.
+                  </p>
+                </div>
+
+                {/* Timeline Range Slider */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-indigo-400" />
                       Target Duration: <span className="text-indigo-400 font-bold">{durationMonths} Months</span>
                     </label>
-
-                    {/* AI Duration Estimator Chip */}
-                    {aiDurationSuggestion ? (
-                      <button
-                        type="button"
-                        onClick={() => setDurationMonths(aiDurationSuggestion.recommended_months)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs hover:bg-indigo-500/20 transition-colors"
-                        title={aiDurationSuggestion.reasoning}
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                        AI Recommends {aiDurationSuggestion.recommended_months} mo · Apply
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleEstimateDuration}
-                        disabled={isEstimatingDuration}
-                        className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        {isEstimatingDuration ? 'Estimating...' : 'Estimate Duration with AI'}
-                      </button>
-                    )}
                   </div>
                   <input
                     type="range"
@@ -480,13 +512,14 @@ export default function WizardPage() {
                   />
                   <div className="flex justify-between text-[11px] text-slate-500">
                     <span>1 month (Sprint)</span>
+                    <span>3 months</span>
                     <span>6 months</span>
                     <span>12 months</span>
                     <span>24 months (Mastery)</span>
                   </div>
                 </div>
 
-                {/* Pacing Control */}
+                {/* Milestone Frequency / Pacing Control */}
                 <div className="space-y-2.5">
                   <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Milestone Frequency
@@ -510,7 +543,7 @@ export default function WizardPage() {
                   </div>
 
                   {/* Overload Guardrail Alert */}
-                  {isOverloadBlocked ? (
+                  {isOverloadBlocked && (
                     <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 shrink-0" />
                       <span>
@@ -518,15 +551,36 @@ export default function WizardPage() {
                         than 6 months to prevent burnout. Choose Weekly or Bi-weekly.
                       </span>
                     </div>
-                  ) : (
-                    <div className="p-2.5 rounded-lg bg-slate-800/30 text-xs text-slate-400 flex items-center justify-between">
-                      <span>Estimated Milestone Count:</span>
-                      <strong className="text-slate-200">~{estimatedMilestones} milestones</strong>
-                    </div>
                   )}
                 </div>
 
-                {/* Dual Gemini Engine Switcher */}
+                {/* Difficulty Selector */}
+                <div className="space-y-2.5">
+                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    Target Difficulty Level
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {DIFFICULTY_LEVELS.map((level) => {
+                      const isSelected = difficulty === level;
+                      return (
+                        <button
+                          key={level}
+                          type="button"
+                          onClick={() => setDifficulty(level)}
+                          className={`p-3 rounded-xl border text-center text-xs capitalize transition-all ${
+                            isSelected
+                              ? 'bg-indigo-500/20 border-indigo-500 text-indigo-200 font-semibold'
+                              : 'bg-slate-800/40 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {level}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Gemini Engine Switcher */}
                 <div className="space-y-2.5 pt-2">
                   <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                     <Cpu className="w-3.5 h-3.5 text-indigo-400" />
@@ -546,9 +600,13 @@ export default function WizardPage() {
                               : 'bg-slate-800/30 border-slate-800 text-slate-400 hover:text-slate-200'
                           }`}
                         >
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                            m.value === 'flash' ? 'bg-amber-500/10 text-amber-400' : 'bg-indigo-500/10 text-indigo-400'
-                          }`}>
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                              m.value === 'flash'
+                                ? 'bg-amber-500/10 text-amber-400'
+                                : 'bg-indigo-500/10 text-indigo-400'
+                            }`}
+                          >
                             <Zap className="w-4 h-4" />
                           </div>
                           <div>
@@ -561,59 +619,22 @@ export default function WizardPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center pt-4 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="btn-secondary inline-flex items-center gap-1.5 text-xs py-2 px-4"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isOverloadBlocked}
-                    onClick={() => setStep(3)}
-                    className="btn-primary inline-flex items-center gap-2 text-sm py-2.5 px-5 disabled:opacity-50"
-                  >
-                    Review Blueprint
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* STEP 3: Review & Generate */}
-            {step === 3 && (
-              <motion.div
-                key="step-3"
-                initial={{ opacity: 0, x: 12 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-indigo-400" />
-                    Review & Blueprint Summary
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                    Your parameters are locked. Ready to invoke Gemini AI synthesis and database persistence.
+                {/* Blueprint Summary Card */}
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Blueprint Summary
+                  </span>
+                  <p className="text-xs font-medium text-slate-200">
+                    {selectedTitle ? (
+                      <>
+                        <span className="text-indigo-400 font-bold">{selectedTitle}</span>
+                        <span className="text-slate-400 block mt-0.5">{goal}</span>
+                      </>
+                    ) : (
+                      goal
+                    )}
                   </p>
-                </div>
-
-                {/* Summary Card */}
-                <div className="p-5 rounded-2xl bg-slate-800/40 border border-slate-800 space-y-4">
-                  <div>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                      Objective Statement
-                    </span>
-                    <p className="text-sm font-medium text-slate-100 mt-1">
-                      {goal}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-800 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800 text-xs">
                     <div>
                       <span className="text-slate-400">Difficulty</span>
                       <p className="font-semibold text-slate-200 capitalize mt-0.5">{difficulty}</p>
@@ -623,12 +644,12 @@ export default function WizardPage() {
                       <p className="font-semibold text-slate-200 mt-0.5">{durationMonths} Months</p>
                     </div>
                     <div>
-                      <span className="text-slate-400">Milestone Pacing</span>
+                      <span className="text-slate-400">Frequency</span>
                       <p className="font-semibold text-slate-200 capitalize mt-0.5">{pacing}</p>
                     </div>
                     <div>
-                      <span className="text-slate-400">AI Engine</span>
-                      <p className="font-semibold text-indigo-400 capitalize mt-0.5">Gemini {geminiModel}</p>
+                      <span className="text-slate-400">Milestones</span>
+                      <p className="font-semibold text-indigo-400 mt-0.5">{targetMilestones} Milestones</p>
                     </div>
                   </div>
                 </div>
@@ -641,7 +662,7 @@ export default function WizardPage() {
                         {generationStepText}
                       </p>
                       <p className="text-xs text-slate-400">
-                        Synthesizing verified documentation and learning deliverables...
+                        Synthesizing verified documentation, playlists, and learning deliverables...
                       </p>
                     </div>
                   </div>
@@ -649,16 +670,17 @@ export default function WizardPage() {
                   <div className="flex justify-between items-center pt-4 border-t border-slate-800">
                     <button
                       type="button"
-                      onClick={() => setStep(2)}
+                      onClick={() => setStep(0)}
                       className="btn-secondary inline-flex items-center gap-1.5 text-xs py-2 px-4"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
-                      Adjust
+                      Back to Objective
                     </button>
                     <button
                       type="button"
+                      disabled={isOverloadBlocked}
                       onClick={handleGenerate}
-                      className="btn-primary inline-flex items-center gap-2 text-sm py-3 px-6 shadow-lg shadow-indigo-500/20"
+                      className="btn-primary inline-flex items-center gap-2 text-sm py-3 px-6 shadow-lg shadow-indigo-500/20 disabled:opacity-50"
                     >
                       <Sparkles className="w-4 h-4" />
                       Generate Adaptive Blueprint

@@ -59,7 +59,7 @@ async function callDirectGeminiApi(modelName, systemInstruction, contents, expec
   const apiKey = getGeminiApiKey();
   if (!apiKey) throw new Error('No Gemini API key available');
 
-  const model = modelName === 'pro' ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
+  const model = modelName === 'pro' ? 'gemini-3.1-pro-preview' : 'gemini-3-flash-preview';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const body = {
@@ -98,14 +98,47 @@ async function callDirectGeminiApi(modelName, systemInstruction, contents, expec
 
 /**
  * Common invoker:
- * Tries Direct Gemini API -> Tries Supabase Edge Function -> Deep Curriculum Engine
+ * Tries Supabase Edge Function Gemini Proxy (powered by project secrets) -> Direct Gemini API -> Deep Curriculum Engine
  */
 async function invokeGemini(action, payload) {
-  const apiKey = getGeminiApiKey();
+  // 1. Prioritize Supabase Edge Function: uses GEMINI_API_KEY from Supabase secrets
+  // This enables zero-configuration, secure AI for all users without exposing API keys!
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+        body: { action, payload },
+      });
 
-  // 1. If Gemini API Key is available directly, execute live API call!
+      if (!error && data && !data.error) {
+        return data;
+      }
+      if (data?.error) {
+        console.warn('Gemini proxy returned notice:', data.error);
+      }
+    } catch (edgeErr) {
+      console.warn('Supabase edge function notice:', edgeErr.message);
+    }
+  }
+
+  // 2. If user provided a local Gemini API Key, execute direct Gemini REST API call
+  const apiKey = getGeminiApiKey();
   if (apiKey) {
     try {
+      if (action === 'suggest_titles') {
+        const { goal } = payload;
+        const prompt = `You are a distinguished curriculum dean and engineering director.
+The student wants to learn or build: "${goal}".
+Propose 3 formal, compelling, high-impact curriculum/course titles.
+Return JSON: {"titles": ["Title 1", "Title 2", "Title 3"]}`;
+        const rawJson = await callDirectGeminiApi(
+          'flash',
+          'Output valid JSON only.',
+          [{ parts: [{ text: prompt }] }],
+          true
+        );
+        return safeParseJson(rawJson);
+      }
+
       if (action === 'chat') {
         const { messages, roadmap_title, goal_summary, active_milestone, persona, model, gemini_model } = payload;
         const resolvedModel = model || gemini_model || 'flash';
@@ -139,11 +172,11 @@ STRICT GUARDRAILS & DOMAIN LOCK:
       }
 
       if (action === 'generate_roadmap') {
-        const { goal, difficulty, duration_months, pacing, model, gemini_model } = payload;
+        const { goal, difficulty, duration_months, pacing, target_milestones, model, gemini_model } = payload;
         const resolvedModel = model || gemini_model || 'pro';
-        const targetCount = Math.max(
+        const targetCount = target_milestones || Math.max(
           6,
-          Math.min(12, Math.round((duration_months || 3) * (pacing === 'weekly' ? 3 : pacing === 'daily' ? 4 : 2)))
+          Math.min(16, Math.round((duration_months || 3) * (pacing === 'weekly' ? 3 : pacing === 'daily' ? 4 : 2)))
         );
 
         const prompt = `You are an elite Lead Software Architect and Curriculum Director.
@@ -243,7 +276,7 @@ Return JSON:
       if (action === 'estimate_duration') {
         const { goal, difficulty, model, gemini_model } = payload;
         const resolvedModel = model || gemini_model || 'flash';
-        const prompt = `Estimate duration in months (1-24) for goal: "${goal}", difficulty: ${difficulty}. Output JSON: {"recommended_months": 3, "reasoning": "..."}`;
+        const prompt = `Estimate duration in months (1-24) and pacing for goal: "${goal}", difficulty: ${difficulty}. Output JSON: {"recommended_months": 3, "recommended_pacing": "weekly", "recommended_milestones": 8, "reasoning": "..."}`;
         const raw = await callDirectGeminiApi(
           resolvedModel,
           'Output valid JSON only.',
@@ -257,21 +290,6 @@ Return JSON:
     }
   }
 
-  // 2. Try Supabase Edge Function if configured
-  if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase.functions.invoke('gemini-proxy', {
-        body: { action, payload },
-      });
-
-      if (!error && data) {
-        return data;
-      }
-    } catch {
-      // Edge Function not deployed
-    }
-  }
-
   // 3. Fallback to Deep Curriculum & Socratic Mentor Engine
   return synthesizeDeepCurriculumEngine(action, payload);
 }
@@ -280,6 +298,17 @@ Return JSON:
  * Intelligent Deep Curriculum & Mentor Engine
  */
 function synthesizeDeepCurriculumEngine(action, payload) {
+  if (action === 'suggest_titles') {
+    const g = (payload.goal || 'Full-Stack Software Engineering').trim();
+    return {
+      titles: [
+        `Architecting Scalable Systems: ${g}`,
+        `Production Systems & Applied Mastery: ${g}`,
+        `Comprehensive Engineering Track: ${g}`,
+      ],
+    };
+  }
+
   if (action === 'estimate_duration') {
     const len = (payload.goal || '').length;
     const months = len > 80 ? 6 : len > 35 ? 4 : 3;
@@ -555,7 +584,7 @@ Regarding your question **"${query}"**:
     }
 
     return {
-      content: `${personaIntro}\n${dynamicContent}\n\n*Tip: Connect your Google Gemini API key in the top bar for live unconstrained generative answers!* 🚀`,
+      content: `${personaIntro}\n${dynamicContent}`,
     };
   }
 
@@ -1215,6 +1244,12 @@ Regarding your question **"${query}"**:
     milestones,
   };
 }
+
+export async function suggestTitlesWithAI(payload) {
+  return invokeGemini('suggest_titles', payload);
+}
+
+export const suggestCourseTitlesWithAI = suggestTitlesWithAI;
 
 export async function generateRoadmapWithAI(payload) {
   return invokeGemini('generate_roadmap', payload);

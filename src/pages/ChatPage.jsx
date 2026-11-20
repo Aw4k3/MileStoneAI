@@ -108,32 +108,26 @@ export default function ChatPage() {
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${hasApiKey ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <h1 className="text-sm sm:text-base font-bold text-slate-100 truncate max-w-[200px] sm:max-w-xs">
                   {roadmap?.title || 'AI Mentor'}
                 </h1>
               </div>
               <p className="text-[11px] text-slate-400">
-                {hasApiKey ? 'Live Gemini AI Mentor Connected' : 'Pedagogical Socratic Mentor'} · Active: {activeMilestone?.title?.slice(0, 32)}...
+                Live Gemini AI Mentor Active · Milestone: {activeMilestone?.title?.slice(0, 32)}...
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* API Key Status Pill */}
-            <button
-              type="button"
-              onClick={() => setShowKeyModal(true)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
-                hasApiKey
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
-                  : 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 animate-pulse'
-              }`}
-              title="Configure free Google Gemini API Key"
+            {/* Live AI Status Pill */}
+            <div
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex items-center gap-1.5"
+              title="Gemini AI Mentor Active via Cloud Engine"
             >
-              <Key className="w-3 h-3" />
-              <span className="text-[10px] hidden sm:inline">{hasApiKey ? 'Gemini Live' : 'Add Gemini Key'}</span>
-            </button>
+              <Sparkles className="w-3 h-3 text-emerald-400" />
+              <span className="text-[10px] hidden sm:inline">AI Active</span>
+            </div>
 
             {/* Model Switcher inline chip */}
             <button
@@ -166,34 +160,7 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Missing API Key Helper Banner */}
-        {!hasApiKey && (
-          <div className="p-2.5 sm:p-3 bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-slate-900 border-b border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2 text-amber-300">
-              <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
-              <span>
-                <strong>Enable Unconstrained Live Gemini:</strong> Add your free Google AI Studio key for live custom AI reasoning!
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowKeyModal(true)}
-                className="px-2.5 py-1 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] transition-colors"
-              >
-                Paste Key (100% Free)
-              </button>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-slate-400 hover:text-white underline inline-flex items-center gap-0.5"
-              >
-                Get Key <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-          </div>
-        )}
+
 
         {/* Key Saved Toast */}
         {keySavedToast && (

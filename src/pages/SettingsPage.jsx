@@ -178,9 +178,9 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2.5">
               <Key className="w-5 h-5 text-indigo-400" />
               <div>
-                <h2 className="text-base font-bold text-slate-100">Google Gemini API Key (Free Tier)</h2>
+                <h2 className="text-base font-bold text-slate-100">Google Gemini AI Engine</h2>
                 <p className="text-xs text-slate-400">
-                  Provide your free Google AI Studio key for live unrestricted Gemini 1.5 responses.
+                  Milestone AI is connected to Google Gemini AI via Supabase Cloud. You may optionally provide a personal Google AI Studio key below to override default quotas.
                 </p>
               </div>
             </div>

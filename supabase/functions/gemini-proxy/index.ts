@@ -1,6 +1,6 @@
 // supabase/functions/gemini-proxy/index.ts
 // Secure Gemini AI Proxy Edge Function for Milestone AI
-// Runs in Deno environment on Supabase Edge Functions
+// Powered by Supabase secrets GEMINI_API_KEY and Gemini 3 Flash / 3.1 Pro
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -18,7 +18,8 @@ interface RequestBody {
     | "chat"
     | "micro_quiz"
     | "estimate_duration"
-    | "rebalance";
+    | "rebalance"
+    | "suggest_titles";
   payload: any;
 }
 
@@ -31,15 +32,21 @@ serve(async (req: Request) => {
   try {
     const { action, payload }: RequestBody = await req.json();
 
-    // Model selection mapping (Defaults to Gemini 1.5 Flash for speed, Pro for deep synthesis)
-    const modelTier = payload?.model === "pro" ? "gemini-1.5-pro" : "gemini-1.5-flash";
+    // Use Gemini 3 Flash Preview as primary workhorse, 3.1 Pro for deep architecture
+    const modelTier =
+      payload?.model === "pro" || payload?.gemini_model === "pro"
+        ? "gemini-3.1-pro-preview"
+        : "gemini-3-flash-preview";
 
-    // If no API key configured, return fallback response with notice
+    // If no API key configured, return fallback response
     if (!GEMINI_API_KEY) {
       return handleMissingApiKeyFallback(action, payload);
     }
 
     switch (action) {
+      case "suggest_titles":
+        return await handleSuggestTitles(payload, modelTier);
+
       case "generate_roadmap":
         return await handleGenerateRoadmap(payload, modelTier);
 
@@ -71,47 +78,91 @@ serve(async (req: Request) => {
 });
 
 // ==============================================================================
-// 1. ACTION: GENERATE COMPLETE ROADMAP
+// 1. ACTION: SUGGEST FORMAL COURSE TITLES
+// ==============================================================================
+async function handleSuggestTitles(payload: any, model: string) {
+  const { goal } = payload;
+
+  const prompt = `You are a distinguished university dean and lead engineering director.
+The student wants to learn or build: "${goal}".
+Propose 3 formal, compelling, high-impact curriculum/course titles.
+
+Return ONLY valid JSON matching:
+{
+  "titles": [
+    "Formal Title 1",
+    "Formal Title 2",
+    "Formal Title 3"
+  ]
+}
+Output raw JSON only.`;
+
+  const responseText = await callGeminiAPI(model, prompt, true);
+  const cleanJson = extractJson(responseText);
+
+  return new Response(cleanJson, {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// ==============================================================================
+// 2. ACTION: GENERATE COMPLETE ROADMAP
 // ==============================================================================
 async function handleGenerateRoadmap(payload: any, model: string) {
-  const { goal, difficulty, duration_months, pacing } = payload;
+  const { goal, difficulty, duration_months, pacing, target_milestones } = payload;
+  const targetCount = target_milestones || Math.max(
+    6,
+    Math.min(16, Math.round((duration_months || 3) * (pacing === 'weekly' ? 3 : pacing === 'daily' ? 4 : 2)))
+  );
 
-  const systemPrompt = `You are a Senior Learning Architect and Curriculum Engineer.
-Generate a comprehensive, adaptive learning blueprint in valid JSON only.
+  const systemPrompt = `You are an elite Senior Learning Architect and Staff Software Engineer.
+Generate an in-depth, production-grade, highly actionable learning blueprint in VALID JSON ONLY.
 
 Goal: "${goal}"
 Difficulty level: ${difficulty}
 Total Duration: ${duration_months} months
 Pacing: ${pacing}
+TARGET MILESTONE COUNT: Generate EXACTLY ${targetCount} comprehensive milestones.
+
+STRICT CURRICULUM REQUIREMENTS:
+1. Provide EXACTLY ${targetCount} sequential milestones progressing logically from foundational tooling/mental models to real-world deployment, testing, and production optimization.
+2. Every milestone title MUST be deeply specific to "${goal}" (NEVER use generic titles like "Phase 1: Foundations").
+3. For EVERY milestone, provide:
+   - "title": Highly descriptive, concrete topic title
+   - "description": 2 to 3 substantive sentences detailing core architectural concepts, execution patterns, and common failure modes
+   - "is_major": boolean (set true on major milestones, e.g. every 3rd or 4th milestone and the final capstone)
+   - "xp_reward": integer between 150 and 400
+   - "deliverables": Array of 4 to 5 rigorous, tangible checklist tasks (e.g. "Configure Room DAOs with Flow", "Verify Stripe webhook signature parsing")
+   - "resources": Array of 3 to 4 authoritative learning resources matching types "course", "video", "book", "docs", or "project".
+     * STRICT RESOURCE CRITERIA: NEVER provide generic search URLs like "youtube.com/results?search_query=...".
+     * Provide actual free courses (e.g. Harvard CS50, Full Stack Open, YC Startup School, Kaggle Learn, freeCodeCamp), dedicated YouTube tutorial playlists/channels (e.g. Net Ninja, Traversy Media, Philipp Lackner), free online books/PDFs (e.g. Eloquent JavaScript, Automate the Boring Stuff, Pro Git, The Mom Test), and official documentation.
 
 JSON output schema must be exact:
 {
-  "title": "Concise, motivating roadmap title (string)",
-  "goal_summary": "1-2 sentence executive overview (string)",
+  "title": "Formal, compelling curriculum title",
+  "goal_summary": "1-2 sentence executive overview",
   "key_outcomes": ["Outcome 1", "Outcome 2", "Outcome 3", "Outcome 4"],
   "milestones": [
     {
-      "title": "Milestone title (string)",
-      "description": "2-3 sentences explaining conceptual objectives (string)",
-      "is_major": boolean (set true on every 3rd or major checkpoint milestone),
+      "title": "Specific Milestone 1 Title",
+      "description": "Comprehensive explanation of what to learn, build, and avoid.",
+      "is_major": false,
       "xp_reward": 150,
       "deliverables": [
-        "Concrete hands-on action item 1",
-        "Concrete hands-on action item 2",
-        "Concrete hands-on action item 3"
+        "Hands-on deliverable 1",
+        "Hands-on deliverable 2",
+        "Hands-on deliverable 3",
+        "Hands-on deliverable 4"
       ],
       "resources": [
-        {
-          "title": "Resource title (string)",
-          "url": "Realistic clickable official documentation, high-quality tutorial, or GitHub project URL (string)",
-          "type": "course" | "book" | "video" | "docs" | "project"
-        }
+        {"title": "Resource Name", "url": "https://...", "type": "course"},
+        {"title": "YouTube Playlist", "url": "https://www.youtube.com/playlist?list=...", "type": "video"},
+        {"title": "Official Documentation", "url": "https://...", "type": "docs"}
       ]
     }
   ]
 }
-
-Ensure all milestones are ordered chronologically. Milestone count should be appropriate for ${duration_months} months with ${pacing} pacing (around 3-6 milestones for compact plans). Output RAW JSON only with no markdown backticks.`;
+Output RAW JSON only with no markdown backticks.`;
 
   const responseText = await callGeminiAPI(model, systemPrompt, true);
   const cleanJson = extractJson(responseText);
@@ -122,7 +173,7 @@ Ensure all milestones are ordered chronologically. Milestone count should be app
 }
 
 // ==============================================================================
-// 2. ACTION: GUARDRAILED MENTOR CHAT
+// 3. ACTION: GUARDRAILED MENTOR CHAT
 // ==============================================================================
 async function handleChat(payload: any, model: string) {
   const { messages, roadmap_title, goal_summary, active_milestone, persona } = payload;
@@ -144,13 +195,13 @@ STRICT GUARDRAILS & DOMAIN LOCK:
 2. If the user asks about unrelated topics (such as general politics, cryptocurrency trading, unrelated cooking, pop culture, sports scores), politely REFUSE and redirect them back to their roadmap deliverables.
 3. Keep answers concise, actionable, and formatted with clean Markdown, bullet points, and code snippets where appropriate.`;
 
-  // Format messages for Gemini API
   const contents = (messages || []).map((msg: any) => ({
     role: msg.role === "assistant" ? "model" : "user",
     parts: [{ text: msg.content }],
   }));
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  const cleanModel = model.replace(/^models\//, "");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${GEMINI_API_KEY}`;
 
   const body = {
     system_instruction: {
@@ -159,7 +210,7 @@ STRICT GUARDRAILS & DOMAIN LOCK:
     contents,
     generationConfig: {
       temperature: 0.7,
-      maxOutputTokens: 1000,
+      maxOutputTokens: 2048,
     },
   };
 
@@ -183,7 +234,7 @@ STRICT GUARDRAILS & DOMAIN LOCK:
 }
 
 // ==============================================================================
-// 3. ACTION: DYNAMIC MICRO-QUIZ FOR MAJOR MILESTONES
+// 4. ACTION: DYNAMIC MICRO-QUIZ FOR MAJOR MILESTONES
 // ==============================================================================
 async function handleMicroQuiz(payload: any, model: string) {
   const { milestone_title, milestone_description } = payload;
@@ -215,20 +266,22 @@ Output raw JSON only.`;
 }
 
 // ==============================================================================
-// 4. ACTION: AI DURATION ESTIMATOR
+// 5. ACTION: AI DURATION & FREQUENCY ESTIMATOR
 // ==============================================================================
 async function handleEstimateDuration(payload: any, model: string) {
   const { goal, difficulty } = payload;
 
   const prompt = `You are an educational time estimation specialist.
-Estimate a realistic duration in months (between 1 and 24) to achieve this goal:
+Estimate a realistic duration in months (between 1 and 24) and recommended pacing frequency for this goal:
 Goal: "${goal}"
 Difficulty: ${difficulty}
 
 Return ONLY valid JSON matching:
 {
   "recommended_months": 3,
-  "reasoning": "1 sentence explanation why this duration is optimal (string)"
+  "recommended_pacing": "weekly",
+  "recommended_milestones": 8,
+  "reasoning": "1-2 sentence explanation why this duration and frequency is optimal (string)"
 }
 Output raw JSON only.`;
 
@@ -241,19 +294,21 @@ Output raw JSON only.`;
 }
 
 // ==============================================================================
-// 5. ACTION: ADAPTIVE REBALANCE SCHEDULE
+// 6. ACTION: ADAPTIVE REBALANCE SCHEDULE
 // ==============================================================================
 async function handleRebalance(payload: any, model: string) {
   const { roadmap_title, remaining_milestones } = payload;
 
   const prompt = `The user is falling behind or adjusting pace on their roadmap: "${roadmap_title}".
 Remaining incomplete milestones: ${JSON.stringify(remaining_milestones)}
+Redistribute the dates and deliverables evenly to relieve overload without losing learning rigor.
 
-Redistribute the remaining milestones across a realistic renewed schedule.
-Return valid JSON only:
+Return JSON:
 {
-  "message": "Schedule adapted: Remaining milestones redistributed across timeline.",
-  "adjusted_milestones": [...]
+  "message": "Encouraging explanation of the rebalanced schedule",
+  "adjusted_milestones": [
+    ...remaining milestones with updated pacing
+  ]
 }`;
 
   const responseText = await callGeminiAPI(model, prompt, true);
@@ -268,12 +323,14 @@ Return valid JSON only:
 // HELPER: CALL GEMINI API
 // ==============================================================================
 async function callGeminiAPI(model: string, prompt: string, expectJson: boolean = false) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  const cleanModel = model.replace(/^models\//, "");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${GEMINI_API_KEY}`;
 
   const body: any = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
-      temperature: 0.4,
+      temperature: expectJson ? 0.3 : 0.7,
+      maxOutputTokens: 8192,
     },
   };
 
@@ -310,126 +367,34 @@ function extractJson(text: string): string {
 
 // Fallback generator when GEMINI_API_KEY is not yet provided in Edge Function secrets
 function handleMissingApiKeyFallback(action: string, payload: any) {
-  if (action === "estimate_duration") {
+  if (action === "suggest_titles") {
+    const g = payload.goal || "Mastery";
     return new Response(
       JSON.stringify({
-        recommended_months: 3,
-        reasoning: "AI suggests 3 months to build foundational mastery with steady weekly pacing.",
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  if (action === "micro_quiz") {
-    return new Response(
-      JSON.stringify({
-        questions: [
-          {
-            id: "q1",
-            question: "What is the core prerequisite before moving past this milestone?",
-            options: [
-              "Verifying unit tests and state encapsulation",
-              "Skipping error handling to ship faster",
-              "Writing everything in a single monolithic file",
-              "Ignoring framework documentation",
-            ],
-            correct_index: 0,
-            explanation: "Solid automated verification guarantees sustainable long-term architecture.",
-          },
-          {
-            id: "q2",
-            question: "How should state transitions be managed in this curriculum?",
-            options: [
-              "Unidirectional data flow with explicit event contracts",
-              "Direct global mutable variables",
-              "Random asynchronous mutations",
-              "Hardcoding values in presentation views",
-            ],
-            correct_index: 0,
-            explanation: "UDF ensures predictable, debuggable state throughout lifecycle changes.",
-          },
-          {
-            id: "q3",
-            question: "What is the key purpose of the deliverables checklist?",
-            options: [
-              "Demonstrating practical, hands-on mastery through working artifacts",
-              "Collecting passive video watch time",
-              "Memorizing definitions without coding",
-              "Filling checkboxes without testing",
-            ],
-            correct_index: 0,
-            explanation: "Active project delivery creates durable real-world competence.",
-          },
+        titles: [
+          `Professional Architecture: ${g}`,
+          `Full-Stack Execution & Mastery: ${g}`,
+          `Applied Engineering: ${g}`,
         ],
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  if (action === "chat") {
+  if (action === "estimate_duration") {
     return new Response(
       JSON.stringify({
-        content: `👋 Hello! I am your AI Mentor.\n\n*Note: Add your GEMINI_API_KEY to Supabase Secrets to unlock live Gemini responses.*\n\nHere are 3 core principles for your milestone:\n1. **Maintain consistency**: Daily deliberate practice builds intuition.\n2. **Isolate state**: Keep components modular and testable.\n3. **Build real projects**: Theoretical knowledge solidifies when you ship.\n\nWhat deliverable would you like to tackle next?`,
+        recommended_months: 3,
+        recommended_pacing: "weekly",
+        recommended_milestones: 8,
+        reasoning: "AI suggests 3 months with weekly pacing to build foundational mastery with steady progress.",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  // Default fallback for generate_roadmap
   return new Response(
-    JSON.stringify({
-      title: payload?.goal ? `Mastery Blueprint: ${payload.goal.slice(0, 36)}` : "Custom AI Learning Blueprint",
-      goal_summary: payload?.goal || "Adaptive curriculum designed for structured mastery.",
-      key_outcomes: [
-        "Solidify foundational architecture and syntax patterns",
-        "Design and test responsive, decoupled project components",
-        "Implement production-grade lifecycle and state persistence",
-        "Deploy a verified end-to-end milestone capstone project",
-      ],
-      milestones: [
-        {
-          title: "Foundations & Environment Calibration",
-          description: "Establish core mental models, developer tooling, and essential primitives.",
-          is_major: false,
-          xp_reward: 150,
-          deliverables: [
-            "Setup local toolchains, linters, and version control",
-            "Build a minimal working proof of concept",
-            "Document architecture assumptions in project README",
-          ],
-          resources: [
-            { title: "Official Getting Started Guide", url: "https://developer.mozilla.org", type: "docs" },
-            { title: "Comprehensive Video Crash Course", url: "https://youtube.com", type: "video" },
-          ],
-        },
-        {
-          title: "Reactive Architecture & State Management",
-          description: "Deep dive into unidirectional data flows, async operations, and testability.",
-          is_major: false,
-          xp_reward: 200,
-          deliverables: [
-            "Refactor business logic into clean domain models",
-            "Write comprehensive automated unit test suites",
-          ],
-          resources: [
-            { title: "Clean Architecture Principles", url: "https://martinfowler.com", type: "book" },
-          ],
-        },
-        {
-          title: "Production Release & Milestone Capstone",
-          description: "Complete and publish a capstone project with automated pipelines and analytics.",
-          is_major: true,
-          xp_reward: 400,
-          deliverables: [
-            "Benchmark performance and eliminate bottleneck metrics",
-            "Deploy live build to production hosting",
-          ],
-          resources: [
-            { title: "Production Deployment Checklist", url: "https://web.dev", type: "docs" },
-          ],
-        },
-      ],
-    }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    JSON.stringify({ error: "Missing GEMINI_API_KEY in Supabase secrets" }),
+    { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
