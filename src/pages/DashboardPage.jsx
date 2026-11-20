@@ -10,15 +10,12 @@ import {
   Award,
   Clock,
   Compass,
-  CheckCircle2,
-  Sparkles,
-  ArrowRight,
-  Target,
-  Zap,
+  Trash2,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import ProgressRing from '../components/common/ProgressRing';
 import Spinner from '../components/common/Spinner';
+import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useRoadmaps } from '../hooks/useRoadmaps';
 import { useStats } from '../hooks/useStats';
@@ -32,8 +29,11 @@ const STARTER_SUGGESTIONS = [
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { roadmaps, milestonesMap, loading: roadmapsLoading } = useRoadmaps();
+  const { roadmaps, milestonesMap, loading: roadmapsLoading, deleteRoadmap } = useRoadmaps();
   const { stats, loading: statsLoading } = useStats();
+
+  const [blueprintToDelete, setBlueprintToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -75,6 +75,19 @@ export default function DashboardPage() {
   const activeBlueprint = roadmaps.find((r) => r.status === 'active') || roadmaps[0];
   const activeMilestones = activeBlueprint ? milestonesMap[activeBlueprint.id] || [] : [];
   const nextMilestone = activeMilestones.find((m) => !m.is_completed) || activeMilestones[0];
+
+  const handleConfirmDelete = async () => {
+    if (!blueprintToDelete) return;
+    try {
+      setIsDeleting(true);
+      await deleteRoadmap(blueprintToDelete.id);
+      setBlueprintToDelete(null);
+    } catch (err) {
+      console.error('Failed to delete blueprint:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (authLoading || roadmapsLoading || statsLoading) {
     return (
@@ -185,6 +198,15 @@ export default function DashboardPage() {
               >
                 Continue Milestone
               </Link>
+              <button
+                type="button"
+                onClick={() => setBlueprintToDelete(activeBlueprint)}
+                className="p-2.5 rounded-xl border border-[#242f42] bg-[#0d131d] hover:bg-rose-500/10 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 transition-colors"
+                aria-label={`Delete ${activeBlueprint.title}`}
+                title="Delete blueprint"
+              >
+                <Trash2 className="w-4 h-4" aria-hidden="true" />
+              </button>
             </div>
           </div>
         )}
@@ -256,7 +278,7 @@ export default function DashboardPage() {
                   >
                     <div className="space-y-2.5">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
+                        <div className="space-y-1 min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span
                               className={`px-2 py-0.5 text-[10px] font-mono font-semibold uppercase rounded border ${
@@ -274,7 +296,23 @@ export default function DashboardPage() {
                             {roadmap.title}
                           </h3>
                         </div>
-                        <ProgressRing progress={percent} size={44} strokeWidth={4} />
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setBlueprintToDelete(roadmap);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-colors"
+                            aria-label={`Delete ${roadmap.title}`}
+                            title="Delete blueprint"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                          </button>
+                          <ProgressRing progress={percent} size={40} strokeWidth={4} />
+                        </div>
                       </div>
 
                       <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
@@ -335,6 +373,16 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmModal
+          isOpen={!!blueprintToDelete}
+          onClose={() => setBlueprintToDelete(null)}
+          onConfirm={handleConfirmDelete}
+          itemTitle={blueprintToDelete?.title || ''}
+          itemType="Blueprint"
+          isDeleting={isDeleting}
+        />
       </div>
     </Layout>
   );

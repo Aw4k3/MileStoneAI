@@ -126,10 +126,14 @@ async function invokeGemini(action, payload) {
     try {
       if (action === 'suggest_titles') {
         const { goal } = payload;
-        const prompt = `You are a distinguished curriculum dean and engineering director.
-The student wants to learn or build: "${goal}".
-Propose 3 formal, compelling, high-impact curriculum/course titles.
-Return JSON: {"titles": ["Title 1", "Title 2", "Title 3"]}`;
+        const prompt = `You are an expert curriculum designer.
+The student wants to learn: "${goal}".
+Generate 4 short, clear, professional course titles for this learning goal.
+Guidelines:
+- Simplify the titles. Avoid overly technical, complicated, or unnecessarily formal wording.
+- Titles should be short, clear, professional, and easy for anyone to understand (3 to 6 words).
+- Examples of good style: "Practical Web Development", "Financial Literacy Fundamentals", "Introduction to Machine Learning", "Everyday Data Analysis".
+Return JSON: {"titles": ["Title 1", "Title 2", "Title 3", "Title 4"]}`;
         const rawJson = await callDirectGeminiApi(
           'flash',
           'Output valid JSON only.',
@@ -299,12 +303,18 @@ Return JSON:
  */
 function synthesizeDeepCurriculumEngine(action, payload) {
   if (action === 'suggest_titles') {
-    const g = (payload.goal || 'Full-Stack Software Engineering').trim();
+    const rawGoal = (payload.goal || 'Engineering').trim();
+    const cleanSubject = rawGoal
+      .replace(/^(learn|master|build|study|how to|i want to learn|i want to build)\s+/i, '')
+      .replace(/[.!?,]+$/, '')
+      .trim();
+    const subject = cleanSubject ? cleanSubject.charAt(0).toUpperCase() + cleanSubject.slice(1) : 'Practical Skills';
     return {
       titles: [
-        `Architecting Scalable Systems: ${g}`,
-        `Production Systems & Applied Mastery: ${g}`,
-        `Comprehensive Engineering Track: ${g}`,
+        `Complete Guide to ${subject}`,
+        `${subject} Fundamentals`,
+        `Modern ${subject} in Practice`,
+        `Mastering ${subject}`,
       ],
     };
   }

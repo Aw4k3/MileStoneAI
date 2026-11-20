@@ -5,12 +5,33 @@ export const APP_NAME = 'Milestone AI'
 export const DIFFICULTY_LEVELS = ['beginner', 'intermediate', 'advanced']
 
 export const PACING_OPTIONS = [
-  { value: 'daily', label: 'Daily', description: 'Every day' },
-  { value: 'every_3_days', label: 'Every 3 Days', description: 'Twice a week' },
-  { value: 'weekly', label: 'Weekly', description: 'Once a week' },
-  { value: 'biweekly', label: 'Bi-weekly', description: 'Every two weeks' },
-  { value: 'monthly', label: 'Monthly', description: 'Once a month' },
+  { value: 'weekly', label: 'Weekly', description: '1 milestone per week' },
+  { value: 'biweekly', label: 'Bi-weekly', description: '1 milestone every 2 weeks' },
+  { value: 'monthly', label: 'Monthly', description: '1 milestone per month' },
+  { value: 'quarterly', label: 'Quarterly', description: '1 milestone every 3 months' },
 ]
+
+/**
+ * Automate milestone count based on duration and pacing frequency:
+ * - 24 months + Monthly = 24 milestones
+ * - 24 months + Quarterly = 8 milestones
+ * - 12 months + Monthly = 12 milestones
+ * - 6 months + Monthly = 6 milestones
+ */
+export function calculateMilestones(durationMonths, pacing) {
+  const months = Math.max(1, Math.round(Number(durationMonths) || 1));
+  switch (pacing) {
+    case 'weekly':
+      return Math.min(36, Math.max(1, months * 4));
+    case 'biweekly':
+      return Math.min(36, Math.max(1, months * 2));
+    case 'quarterly':
+      return Math.max(1, Math.round(months / 3));
+    case 'monthly':
+    default:
+      return Math.max(1, months);
+  }
+}
 
 export const GEMINI_MODELS = [
   { value: 'flash', label: 'Gemini Flash', description: 'Fast — chat, quizzes' },

@@ -1,6 +1,6 @@
 // src/pages/RoadmapPage.jsx
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare,
@@ -20,13 +20,15 @@ import {
   Code,
   Brain,
   Layers,
-  Check,
+  Trash2,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import ProgressRing from '../components/common/ProgressRing';
 import Modal from '../components/common/Modal';
+import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import Spinner from '../components/common/Spinner';
 import { useRoadmapDetail } from '../hooks/useRoadmapDetail';
+import { useRoadmaps } from '../hooks/useRoadmaps';
 import { useStats } from '../hooks/useStats';
 import {
   generateMicroQuizWithAI,
@@ -35,6 +37,8 @@ import {
 
 export default function RoadmapPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { deleteRoadmap } = useRoadmaps();
   const {
     roadmap,
     milestones,
@@ -55,6 +59,22 @@ export default function RoadmapPage() {
 
   const [isRebalancing, setIsRebalancing] = useState(false);
   const [rebalanceToast, setRebalanceToast] = useState('');
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await deleteRoadmap(roadmap.id);
+      setShowDeleteModal(false);
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Failed to delete blueprint:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   React.useEffect(() => {
     if (milestones.length > 0 && expandedId === null) {
@@ -312,6 +332,16 @@ export default function RoadmapPage() {
               >
                 <Calendar className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
                 Sync .ics
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 text-slate-400 hover:text-rose-400 hover:border-rose-500/30 transition-colors"
+                title="Delete this blueprint"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" aria-hidden="true" />
+                Delete Blueprint
               </button>
             </div>
 
@@ -600,6 +630,16 @@ export default function RoadmapPage() {
           </form>
         )}
       </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        itemTitle={roadmap?.title || ''}
+        itemType="Blueprint"
+        isDeleting={isDeleting}
+      />
     </Layout>
   );
 }

@@ -294,6 +294,23 @@ export function useRoadmaps() {
     delete currentStoredMilestones[roadmapId];
     saveLocalRoadmaps(userId, currentStoredRoadmaps, currentStoredMilestones);
 
+    // Also clean up guest storage if present
+    try {
+      const guestRaw = localStorage.getItem('milestone_ai_guest_roadmaps');
+      if (guestRaw) {
+        const guestList = JSON.parse(guestRaw).filter((r) => r.id !== roadmapId);
+        localStorage.setItem('milestone_ai_guest_roadmaps', JSON.stringify(guestList));
+      }
+      const guestM = localStorage.getItem('milestone_ai_guest_milestones');
+      if (guestM) {
+        const gMap = JSON.parse(guestM);
+        delete gMap[roadmapId];
+        localStorage.setItem('milestone_ai_guest_milestones', JSON.stringify(gMap));
+      }
+    } catch {
+      // Ignore local storage error
+    }
+
     setRoadmaps((prev) => prev.filter((r) => r.id !== roadmapId));
     setMilestonesMap((prev) => {
       const copy = { ...prev };

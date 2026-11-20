@@ -83,16 +83,21 @@ serve(async (req: Request) => {
 async function handleSuggestTitles(payload: any, model: string) {
   const { goal } = payload;
 
-  const prompt = `You are a distinguished university dean and lead engineering director.
-The student wants to learn or build: "${goal}".
-Propose 3 formal, compelling, high-impact curriculum/course titles.
+  const prompt = `You are an expert curriculum designer.
+The student wants to learn: "${goal}".
+Generate 4 short, clear, professional course titles for this learning goal.
+Guidelines:
+- Simplify the titles. Avoid overly technical, complicated, or unnecessarily formal wording.
+- Titles should be short, clear, professional, and easy for anyone to understand (3 to 6 words).
+- Examples of good style: "Practical Web Development", "Financial Literacy Fundamentals", "Introduction to Machine Learning", "Everyday Data Analysis".
 
 Return ONLY valid JSON matching:
 {
   "titles": [
-    "Formal Title 1",
-    "Formal Title 2",
-    "Formal Title 3"
+    "Title 1",
+    "Title 2",
+    "Title 3",
+    "Title 4"
   ]
 }
 Output raw JSON only.`;
@@ -368,13 +373,19 @@ function extractJson(text: string): string {
 // Fallback generator when GEMINI_API_KEY is not yet provided in Edge Function secrets
 function handleMissingApiKeyFallback(action: string, payload: any) {
   if (action === "suggest_titles") {
-    const g = payload.goal || "Mastery";
+    const rawGoal = (payload.goal || "Professional Skills").trim();
+    const cleanSubject = rawGoal
+      .replace(/^(learn|master|build|study|how to|i want to learn|i want to build)\s+/i, '')
+      .replace(/[.!?,]+$/, '')
+      .trim();
+    const subject = cleanSubject ? cleanSubject.charAt(0).toUpperCase() + cleanSubject.slice(1) : 'Practical Skills';
     return new Response(
       JSON.stringify({
         titles: [
-          `Professional Architecture: ${g}`,
-          `Full-Stack Execution & Mastery: ${g}`,
-          `Applied Engineering: ${g}`,
+          `Complete Guide to ${subject}`,
+          `${subject} Fundamentals`,
+          `Modern ${subject} in Practice`,
+          `Mastering ${subject}`,
         ],
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

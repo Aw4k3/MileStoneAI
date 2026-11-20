@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, Eye, EyeOff, Rocket, RefreshCw, Zap } from 'lucide-react';
+import { Eye, EyeOff, Rocket, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Spinner from '../components/common/Spinner';
 
@@ -53,17 +53,6 @@ export default function AuthPage() {
     } catch (err) {
       setIsGoogleLoading(false);
       setFormError(err.message || 'Google sign-in could not be completed.');
-    }
-  };
-
-  const handleDemoLogin = async () => {
-    try {
-      setFormError('');
-      await login('demo@milestoneai.dev', 'DemoPass123!');
-      navigate('/dashboard');
-    } catch {
-      // Fallback: create or proceed
-      navigate('/dashboard');
     }
   };
 
@@ -126,22 +115,12 @@ export default function AuthPage() {
           </div>
         )}
 
-        {/* 1-Click Instant Demo Login (Hackathon & Fast Evaluation) */}
-        <button
-          type="button"
-          onClick={handleDemoLogin}
-          className="w-full py-2.5 px-4 rounded-xl border border-blue-500/30 bg-blue-600/10 hover:bg-blue-600/20 text-blue-300 text-xs font-semibold flex items-center justify-center gap-2 transition-colors mb-4"
-        >
-          <Zap className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
-          <span>Instant Demo Access (1-Click)</span>
-        </button>
-
         {/* Google OAuth Quick Button */}
         <button
           type="button"
           onClick={handleGoogle}
           disabled={loading || isGoogleLoading}
-          className="w-full py-2.5 px-4 rounded-xl border border-[#242f42] bg-[#0d131d] hover:bg-[#161f2e] text-slate-200 text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors mb-5 disabled:opacity-50"
+          className="w-full py-2.5 px-4 rounded-xl border border-[#242f42] bg-[#0d131d] hover:bg-[#161f2e] text-slate-200 text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors mb-4 disabled:opacity-50"
         >
           {isGoogleLoading ? (
             <div className="flex items-center gap-2">
@@ -173,12 +152,14 @@ export default function AuthPage() {
           )}
         </button>
 
-        <div className="relative flex items-center justify-center mb-5">
-          <div className="border-t border-[#1e293b] w-full" />
-          <span className="bg-[#121824] px-2.5 text-[11px] text-slate-400 font-mono">
+        {/* Centered Or Email Divider */}
+        <div className="relative flex items-center justify-center my-4">
+          <div className="absolute inset-0 flex items-center" aria-hidden="true">
+            <div className="w-full border-t border-[#1e293b]" />
+          </div>
+          <span className="relative bg-[#121824] px-3 text-[11px] font-mono text-slate-400 uppercase tracking-wider">
             or email
           </span>
-          <div className="border-t border-[#1e293b] w-full" />
         </div>
 
         {/* Email & Password Form */}
@@ -194,19 +175,16 @@ export default function AuthPage() {
                 <label htmlFor="fullName" className="block text-xs font-semibold text-slate-300 mb-1">
                   Full Name
                 </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" aria-hidden="true" />
-                  <input
-                    id="fullName"
-                    name="fullName"
-                    type="text"
-                    autoComplete="name"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Alex Chen"
-                    className="input-field pl-9 text-xs py-2.5"
-                  />
-                </div>
+                <input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  autoComplete="name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Alex Chen"
+                  className="input-field text-xs py-2.5"
+                />
               </motion.div>
             )}
           </AnimatePresence>
@@ -215,21 +193,18 @@ export default function AuthPage() {
             <label htmlFor="email" className="block text-xs font-semibold text-slate-300 mb-1">
               Email Address
             </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" aria-hidden="true" />
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                spellCheck={false}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="input-field pl-9 text-xs py-2.5"
-              />
-            </div>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              spellCheck={false}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="input-field text-xs py-2.5"
+            />
           </div>
 
           <div>
@@ -239,7 +214,6 @@ export default function AuthPage() {
               </label>
             </div>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" aria-hidden="true" />
               <input
                 id="password"
                 name="password"
@@ -250,7 +224,7 @@ export default function AuthPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="input-field pl-9 pr-9 text-xs py-2.5"
+                className="input-field pr-10 text-xs py-2.5"
               />
               <button
                 type="button"
