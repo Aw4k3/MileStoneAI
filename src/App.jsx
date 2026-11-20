@@ -10,6 +10,7 @@ import WizardPage from './pages/WizardPage';
 import RoadmapPage from './pages/RoadmapPage';
 import ChatPage from './pages/ChatPage';
 import SettingsPage from './pages/SettingsPage';
+import DocsPage from './pages/DocsPage';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/docs" element={<DocsPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route
             path="/wizard"

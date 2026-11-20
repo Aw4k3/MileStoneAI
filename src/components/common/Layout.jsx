@@ -8,6 +8,7 @@ import {
   Settings,
   LogOut,
   Sparkles,
+  Presentation,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -24,6 +25,7 @@ export default function Layout({ children }) {
   const navLinks = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { label: 'New Blueprint', path: user ? '/wizard' : '/auth', icon: PlusCircle },
+    { label: 'Docs & Deck', path: '/docs', icon: Presentation },
     { label: 'Settings', path: '/settings', icon: Settings },
   ];
 

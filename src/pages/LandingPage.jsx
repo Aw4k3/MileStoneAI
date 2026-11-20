@@ -64,6 +64,13 @@ export default function LandingPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link
+            to="/docs"
+            className="text-xs sm:text-sm font-semibold text-indigo-400 hover:text-indigo-300 px-3 py-1.5 transition-colors flex items-center gap-1"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Pitch Deck &amp; Docs
+          </Link>
+          <Link
             to="/auth"
             className="text-sm font-medium text-slate-300 hover:text-white px-3 py-1.5 transition-colors"
           >
@@ -163,8 +170,21 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="text-center text-xs text-slate-500 py-6 border-t border-slate-800/40">
+      <footer className="text-center text-xs text-slate-500 py-6 border-t border-slate-800/40 flex flex-col sm:flex-row items-center justify-between max-w-6xl w-full mx-auto px-6 gap-3">
         <p>© {new Date().getFullYear()} Milestone AI · Free Tier AI Architecture</p>
+        <div className="flex items-center gap-4 text-xs">
+          <Link to="/docs" className="text-indigo-400 hover:text-white transition-colors">
+            Live /docs (YC Deck &amp; Tech Spec)
+          </Link>
+          <a
+            href="https://github.com/Aw4k3/MileStoneAI"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-slate-400 hover:text-white transition-colors"
+          >
+            GitHub
+          </a>
+        </div>
       </footer>
     </div>
   );
