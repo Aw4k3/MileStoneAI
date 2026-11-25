@@ -73,6 +73,55 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
 
+    async function hydrateProfileInBackground(authUser) {
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        const isDeletedOrInvalid =
+          userError &&
+          (userError.status === 401 ||
+            userError.status === 403 ||
+            /does not exist|invalid|not found/i.test(userError.message || ''));
+
+        if (isDeletedOrInvalid) {
+          console.warn('Session no longer valid on server. Purging stale local session.');
+          try {
+            await supabase.auth.signOut();
+          } catch {
+            // ignore
+          }
+          clearUserStorage(authUser.id);
+          if (mounted) {
+            setSession(null);
+            setUser(null);
+          }
+          return;
+        }
+
+        const verifiedUser = userData?.user || authUser;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('display_name, avatar_url, email')
+          .eq('id', verifiedUser.id)
+          .maybeSingle();
+
+        if (mounted && profile) {
+          setUser((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  display_name: profile.display_name || prev.display_name,
+                  avatar_url: profile.avatar_url || prev.avatar_url,
+                }
+              : prev
+          );
+        }
+
+        syncProfile(verifiedUser);
+      } catch {
+        // Non-fatal background check
+      }
+    }
+
     async function initAuth() {
       try {
         const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
@@ -81,63 +130,30 @@ export function AuthProvider({ children }) {
         }
 
         if (initialSession?.user) {
-          // Verify with Supabase server whether user ACTUALLY still exists in database
-          const { data: userData, error: userError } = await supabase.auth.getUser();
-
-          if (userError || !userData?.user) {
-            console.warn('User does not exist on Supabase server (possibly deleted). Purging stale local session.');
-            try {
-              await supabase.auth.signOut();
-            } catch {
-              // ignore
-            }
-            clearUserStorage(initialSession.user.id);
-            if (mounted) {
-              setSession(null);
-              setUser(null);
-              setLoading(false);
-            }
-            return;
-          }
+          const authUser = initialSession.user;
+          const displayName =
+            authUser.user_metadata?.full_name ||
+            authUser.user_metadata?.name ||
+            authUser.email?.split('@')[0] ||
+            'Adventurer';
+          const avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
 
           if (mounted) {
             setSession(initialSession);
-            const authUser = userData.user;
-            let displayName =
-              authUser.user_metadata?.full_name ||
-              authUser.user_metadata?.name ||
-              authUser.email?.split('@')[0] ||
-              'Adventurer';
-            let avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
-
-            try {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('display_name, avatar_url, email')
-                .eq('id', authUser.id)
-                .maybeSingle();
-
-              if (profile?.display_name) displayName = profile.display_name;
-              if (profile?.avatar_url) avatarUrl = profile.avatar_url;
-            } catch {
-              // Non-fatal
-            }
-
-            // Sync email and metadata to profiles
-            syncProfile(authUser);
-
             setUser({
               id: authUser.id,
               email: authUser.email,
               display_name: displayName,
               avatar_url: avatarUrl,
             });
+            setLoading(false);
           }
-        } else {
-          if (mounted) {
-            setSession(null);
-            setUser(null);
-          }
+
+          hydrateProfileInBackground(authUser);
+          return;
+        } else if (mounted) {
+          setSession(null);
+          setUser(null);
         }
       } catch (err) {
         console.warn('Auth initialization notice:', err.message);
@@ -153,7 +169,7 @@ export function AuthProvider({ children }) {
     initAuth();
 
     // Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
 
       if (event === 'SIGNED_OUT' || !newSession?.user) {
@@ -165,27 +181,12 @@ export function AuthProvider({ children }) {
 
       if (newSession?.user) {
         const authUser = newSession.user;
-        let displayName =
+        const displayName =
           authUser.user_metadata?.full_name ||
           authUser.user_metadata?.name ||
           authUser.email?.split('@')[0] ||
           'Adventurer';
-        let avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
-
-        try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('display_name, avatar_url, email')
-            .eq('id', authUser.id)
-            .maybeSingle();
-
-          if (profile?.display_name) displayName = profile.display_name;
-          if (profile?.avatar_url) avatarUrl = profile.avatar_url;
-        } catch {
-          // Non-fatal
-        }
-
-        syncProfile(authUser);
+        const avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
 
         setUser({
           id: authUser.id,
@@ -194,6 +195,8 @@ export function AuthProvider({ children }) {
           avatar_url: avatarUrl,
         });
         setLoading(false);
+
+        hydrateProfileInBackground(authUser);
       }
     });
 

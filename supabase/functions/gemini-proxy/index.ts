@@ -15,6 +15,7 @@ const corsHeaders = {
 interface RequestBody {
   action:
     | "generate_roadmap"
+    | "generate_title"
     | "chat"
     | "micro_quiz"
     | "estimate_duration"
@@ -46,6 +47,9 @@ serve(async (req: Request) => {
     }
 
     switch (action) {
+      case "generate_title":
+        return await handleGenerateTitle(payload);
+
       case "suggest_titles":
         return await handleSuggestTitles(payload, modelTier);
 
@@ -86,18 +90,29 @@ serve(async (req: Request) => {
 });
 
 // ==============================================================================
-// SHARED MULTI-MODEL CALLER FOR AI PATHWAY COMPILER
-// Default model: gemini-2.5-flash with automatic failover on API/quota/model errors
+// SHARED MULTI-MODEL CALLER FOR BLUEPRINT ENGINE
+// Failover order: gemini-3.5-flash -> gemini-2.5-pro -> gemini-2.5-flash -> gemini-2.0-flash
 // ==============================================================================
-function buildPathwayModelChain(preferredModel?: string): string[] {
+function buildPathwayModelChain(preferredModel?: string, singleModel?: boolean): string[] {
+  if (singleModel && preferredModel) {
+    return [preferredModel];
+  }
   const candidates = [
     preferredModel,
+    "gemini-3.5-flash",
+    "gemini-2.5-pro",
     "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
     "gemini-2.0-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.8-flash",
+    "gemini-flash-latest",
+    "gemini-3.1-pro-preview",
     "gemini-3-flash-preview",
   ];
-  return candidates.filter((m, idx, arr): m is string => Boolean(m) && arr.indexOf(m) === idx);
+  const unique = candidates.filter((m, idx, arr): m is string => Boolean(m) && arr.indexOf(m) === idx);
+  // Append one trailing pass on the fast lite model in case of a brief 503 high-demand spike
+  return singleModel ? unique : [...unique, "gemini-3.5-flash-lite"];
 }
 
 async function callGeminiJsonWithFallback(opts: {
@@ -107,9 +122,10 @@ async function callGeminiJsonWithFallback(opts: {
   maxOutputTokens?: number;
   preferredModel?: string;
   timeoutMs?: number;
-}): Promise<{ jsonText: string; modelUsed: string }> {
-  const models = buildPathwayModelChain(opts.preferredModel);
-  let lastError: Error | null = null;
+  singleModel?: boolean;
+}): Promise<{ jsonText: string; modelUsed: string; attemptErrors: string[] }> {
+  const models = buildPathwayModelChain(opts.preferredModel, opts.singleModel);
+  const attemptErrors: string[] = [];
   const timeoutMs = opts.timeoutMs ?? 90000;
 
   for (const model of models) {
@@ -144,29 +160,74 @@ async function callGeminiJsonWithFallback(opts: {
 
       if (!res.ok) {
         const errorText = await res.text();
-        throw new Error(`Model ${cleanModel} failed (${res.status}): ${errorText}`);
+        let brief = errorText;
+        try {
+          const parsedErr = JSON.parse(errorText);
+          brief = parsedErr?.error?.message || errorText;
+        } catch {}
+        throw new Error(`HTTP ${res.status}: ${brief.slice(0, 180)}`);
       }
 
       const data = await res.json();
       const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
       if (!rawText.trim()) {
-        throw new Error(`Model ${cleanModel} returned empty response`);
+        const finishReason = data?.candidates?.[0]?.finishReason || "EMPTY";
+        throw new Error(`Empty output (${finishReason})`);
       }
 
       const jsonText = extractJson(rawText);
-      // Verify it parses cleanly before accepting this model's output
       JSON.parse(jsonText);
 
-      return { jsonText, modelUsed: cleanModel };
+      return { jsonText, modelUsed: cleanModel, attemptErrors };
     } catch (err: any) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      console.warn(`[gemini-proxy] ${cleanModel} attempt failed:`, lastError.message);
+      const msg = err instanceof Error ? err.message : String(err);
+      attemptErrors.push(`${cleanModel} -> ${msg}`);
+      console.warn(`[gemini-proxy] ${cleanModel} attempt failed:`, msg);
     } finally {
       clearTimeout(timer);
     }
   }
 
-  throw lastError || new Error("All Gemini models failed to produce a valid JSON response.");
+  throw new Error(`All Gemini models failed: ${attemptErrors.join(" | ")}`);
+}
+
+// ==============================================================================
+// BLUEPRINT TITLE GENERATOR (fast, concise 2-4 word title via Gemini)
+// ==============================================================================
+async function handleGenerateTitle(payload: any) {
+  const goal = String(payload?.goal || "").trim();
+  if (!goal) {
+    return new Response(
+      JSON.stringify({ error: "Missing learning goal for title generation." }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const prompt = `Create a simple, clean, natural course title (maximum 4 words, plain everyday wording, no colons or buzzwords) for this learning goal:
+"${goal}"
+
+Good examples: "Python for Data Science", "Modern Web Development", "Spoken French Basics", "Personal Finance Fundamentals".
+Return ONLY valid JSON matching: {"title": "Short Clean Title"}`;
+
+  const { jsonText, modelUsed, attemptErrors } = await callGeminiJsonWithFallback({
+    prompt,
+    systemInstruction: 'Return valid JSON only: {"title": string}.',
+    temperature: 0.2,
+    maxOutputTokens: 2048,
+    preferredModel: payload?.model || "gemini-3.5-flash",
+    timeoutMs: Number(payload?.timeoutMs) || 8000,
+    singleModel: Boolean(payload?.singleModel),
+  });
+
+  const parsed = JSON.parse(jsonText);
+  return new Response(
+    JSON.stringify({
+      title: String(parsed?.title || "").trim(),
+      model_used: modelUsed,
+      ...(attemptErrors.length ? { attempts: attemptErrors } : {}),
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
 }
 
 // ==============================================================================
@@ -195,13 +256,14 @@ Choose the closest realistic duration among 1, 3, 6, 12, or 24 months (or an int
 Return ONLY valid JSON with this exact structure:
 {"recommended_months": 3, "reasoning": "Brief explanation of why this duration is realistic and what factors you considered."}`;
 
-  const { jsonText, modelUsed } = await callGeminiJsonWithFallback({
+  const { jsonText, modelUsed, attemptErrors } = await callGeminiJsonWithFallback({
     prompt,
     systemInstruction: "You are an expert learning strategist. Return valid JSON only matching {\"recommended_months\": number, \"reasoning\": string}.",
     temperature: 0.2,
-    maxOutputTokens: 1024,
-    preferredModel: payload?.model || "gemini-2.5-flash",
-    timeoutMs: 60000,
+    maxOutputTokens: 2048,
+    preferredModel: payload?.model || "gemini-3.5-flash",
+    timeoutMs: Number(payload?.timeoutMs) || 12000,
+    singleModel: Boolean(payload?.singleModel),
   });
 
   const parsed = JSON.parse(jsonText);
@@ -210,6 +272,7 @@ Return ONLY valid JSON with this exact structure:
       recommended_months: Number(parsed.recommended_months) || 3,
       reasoning: parsed.reasoning || "",
       model_used: modelUsed,
+      ...(attemptErrors.length ? { attempts: attemptErrors } : {}),
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
@@ -223,7 +286,7 @@ async function handleCompilePathway(payload: any) {
   const durationMonths = Number(payload?.durationMonths) || 3;
   const pacing = String(payload?.pacing || "weekly");
   const milestoneCount = Number(payload?.milestoneCount) || 12;
-  const preferredModel = payload?.model || "gemini-2.5-flash";
+  const preferredModel = payload?.model || "gemini-3.5-flash";
 
   if (!goal) {
     return new Response(
@@ -292,13 +355,14 @@ Return ONLY valid JSON matching:
   ]
 }`;
 
-  const { jsonText, modelUsed } = await callGeminiJsonWithFallback({
+  const { jsonText, modelUsed, attemptErrors } = await callGeminiJsonWithFallback({
     prompt,
     systemInstruction,
     temperature: 0.3,
-    maxOutputTokens: 65536,
+    maxOutputTokens: 32768,
     preferredModel,
-    timeoutMs: 95000,
+    timeoutMs: Number(payload?.timeoutMs) || 55000,
+    singleModel: Boolean(payload?.singleModel),
   });
 
   const parsed = JSON.parse(jsonText);
@@ -306,6 +370,7 @@ Return ONLY valid JSON matching:
     JSON.stringify({
       ...parsed,
       model_used: modelUsed,
+      ...(attemptErrors.length ? { attempts: attemptErrors } : {}),
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
@@ -562,8 +627,8 @@ Return JSON:
 // HELPER: CALL GEMINI API
 // ==============================================================================
 async function callGeminiAPI(model: string, prompt: string, expectJson: boolean = false) {
-  const cleanModel = model.replace(/^models\//, "");
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${GEMINI_API_KEY}`;
+  const models = buildPathwayModelChain(model);
+  const errors: string[] = [];
 
   const body: any = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -577,19 +642,40 @@ async function callGeminiAPI(model: string, prompt: string, expectJson: boolean 
     body.generationConfig.responseMimeType = "application/json";
   }
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  for (const candidate of models) {
+    const cleanModel = candidate.replace(/^models\//, "");
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${GEMINI_API_KEY}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 35000);
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Gemini API Error (${res.status}): ${errorText}`);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        errors.push(`${cleanModel} (${res.status}): ${errorText.slice(0, 140)}`);
+        continue;
+      }
+
+      const json = await res.json();
+      const text = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      if (text.trim()) {
+        return text;
+      }
+      errors.push(`${cleanModel}: empty response`);
+    } catch (err: any) {
+      errors.push(`${cleanModel}: ${err?.message || String(err)}`);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
-  const json = await res.json();
-  return json?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+  throw new Error(`Gemini API Error across fallback chain: ${errors.join(" | ")}`);
 }
 
 // Extract JSON safely from string
@@ -610,6 +696,22 @@ function extractJson(text: string): string {
 
 // Fallback generator when GEMINI_API_KEY is not yet provided in Edge Function secrets
 function handleMissingApiKeyFallback(action: string, payload: any) {
+  if (action === "generate_title") {
+    const rawGoal = (payload.goal || "Learning Blueprint").trim();
+    const cleanSubject = rawGoal
+      .replace(/^(learn|master|build|study|how to|i want to learn|i want to build)\s+/i, "")
+      .replace(/[.!?,]+$/, "")
+      .trim();
+    const words = (cleanSubject || "Learning Blueprint").split(/\s+/).slice(0, 4);
+    const title = words
+      .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+    return new Response(
+      JSON.stringify({ title: title || "Learning Blueprint", model_used: "fallback" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   if (action === "suggest_titles") {
     const rawGoal = (payload.goal || "Professional Skills").trim();
     const cleanSubject = rawGoal

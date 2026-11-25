@@ -137,7 +137,7 @@ export default function LandingPage() {
           {/* Engine Capability Indicator */}
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#131b26] border border-[#242f42] text-xs font-mono text-slate-300 mb-6">
             <span className="w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
-            Curriculum Architecture Engine · Gemini 2.5 Flash &amp; Supabase
+            Adaptive Curriculum Engine
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.1] text-white mb-6">
@@ -181,7 +181,7 @@ export default function LandingPage() {
             </div>
             <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
               <Brain className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
-              Powered by Gemini 2.5 Flash
+              AI-Guided Learning Strategy
             </span>
           </div>
 
@@ -207,7 +207,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="text-xs text-slate-500 py-6 border-t border-[#1e293b] flex flex-col sm:flex-row items-center justify-between max-w-6xl w-full mx-auto px-6 gap-3">
-        <p>© {new Date().getFullYear()} Milestone AI · Gemini 2.5 Flash &amp; Supabase Edge</p>
+        <p>© {new Date().getFullYear()} Milestone AI · Adaptive Learning Blueprints</p>
         <div className="flex items-center gap-4 text-xs">
           <Link to="/docs" className="text-blue-400 hover:text-white transition-colors">
             YC Pitch Deck &amp; Architecture

@@ -12,30 +12,7 @@ export const PACING_OPTIONS = [
   { value: 'monthly', label: 'Monthly', description: '1 milestone per month', icon: '🌙' },
 ];
 
-export const DEFAULT_BLUEPRINT_MODEL = 'gemini-2.5-flash';
-
-export const BLUEPRINT_MODELS = [
-  {
-    value: 'gemini-2.5-flash',
-    label: 'Gemini 2.5 Flash',
-    description: 'Default — fast & accurate curriculum synthesis',
-  },
-  {
-    value: 'gemini-3-flash-preview',
-    label: 'Gemini 3 Flash Preview',
-    description: 'Next-gen Flash tier for rich curation',
-  },
-  {
-    value: 'gemini-2.0-flash',
-    label: 'Gemini 2.0 Flash',
-    description: 'Alternate stable Flash model',
-  },
-  {
-    value: 'gemini-2.5-pro',
-    label: 'Gemini 2.5 Pro',
-    description: 'Deep reasoning for dense subjects',
-  },
-];
+export const DEFAULT_BLUEPRINT_MODEL = 'gemini-3.5-flash';
 
 export function normalizePacingKey(pacing) {
   const raw = String(pacing || 'weekly').toLowerCase();
@@ -104,11 +81,6 @@ export function getMilestoneLabel(offset, pacing) {
       return `Week ${n}`;
   }
 }
-
-export const GEMINI_MODELS = [
-  { value: 'flash', label: 'Gemini Flash', description: 'Fast — chat, quizzes' },
-  { value: 'pro', label: 'Gemini Pro', description: 'Deep — blueprint generation' },
-];
 
 export const MENTOR_PERSONAS = [
   { value: 'tutor', label: 'Socratic Tutor', emoji: '🎓' },

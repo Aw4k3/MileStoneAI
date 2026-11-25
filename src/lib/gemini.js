@@ -5,19 +5,23 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import {
   DEFAULT_BLUEPRINT_MODEL,
-  BLUEPRINT_MODELS,
   calculateMilestones,
   normalizePacingKey,
 } from './constants';
 
-export { DEFAULT_BLUEPRINT_MODEL, BLUEPRINT_MODELS };
+export { DEFAULT_BLUEPRINT_MODEL };
 
 const MODEL_FALLBACK_ORDER = [
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-2.0-flash',
-  'gemini-3-flash-preview',
+  'gemini-3.5-flash',
   'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-flash-lite-latest',
+  'gemini-3.8-flash',
+  'gemini-flash-latest',
+  'gemini-3.1-pro-preview',
+  'gemini-3-flash-preview',
 ];
 
 const RESOURCE_TYPES_CANONICAL = {
@@ -57,30 +61,45 @@ export function generateUUID() {
 }
 
 /**
- * Generates a simple, clean, human-friendly default title from a learning goal.
+ * Generates a short, clean blueprint title using Gemini.
  */
-export function deriveNiceBlueprintTitle(goal) {
-  const raw = String(goal || '').trim();
-  if (!raw) return 'Custom Learning Blueprint';
+export async function generateBlueprintTitleWithAI({ goal }) {
+  const cleanGoal = String(goal || '').trim();
+  if (!cleanGoal) return '';
 
-  const cleaned = raw
-    .replace(/^(i\s+want\s+to\s+|want\s+to\s+|how\s+to\s+|learn\s+|master\s+|study\s+|build\s+)/i, '')
-    .replace(/[.!?,;:]+$/, '')
-    .trim();
-
-  if (!cleaned) return 'Custom Learning Blueprint';
-
-  const words = cleaned.split(/\s+/).slice(0, 6);
-  const titleCased = words
-    .map((w, idx) => {
-      if (idx > 0 && /^(and|or|for|with|in|to|of|from|the|a|an)$/i.test(w)) {
-        return w.toLowerCase();
+  if (isSupabaseConfigured) {
+    try {
+      const data = await invokeSupabaseFunction(
+        'gemini-proxy',
+        { action: 'generate_title', payload: { goal: cleanGoal, model: DEFAULT_BLUEPRINT_MODEL } },
+        25000
+      );
+      if (data?.title && String(data.title).trim()) {
+        return String(data.title).trim();
       }
-      return w.charAt(0).toUpperCase() + w.slice(1);
-    })
-    .join(' ');
+    } catch (err) {
+      console.warn('generate_title proxy notice:', err.message);
+    }
+  }
 
-  return titleCased.length > 48 ? `${titleCased.slice(0, 45).trim()}…` : titleCased;
+  if (getGeminiApiKey()) {
+    const prompt = `Create a simple, clean, natural course title (maximum 4 words, plain everyday wording, no colons) for this learning goal:
+"${cleanGoal}"
+Return ONLY valid JSON: {"title": "Short Clean Title"}`;
+    const { text } = await callDirectGeminiApi({
+      prompt,
+      systemInstruction: 'Return valid JSON only: {"title": string}.',
+      temperature: 0.2,
+      expectJson: true,
+      timeoutMs: 25000,
+      preferredModel: DEFAULT_BLUEPRINT_MODEL,
+      maxOutputTokens: 2048,
+    });
+    const parsed = safeParseJson(text);
+    if (parsed?.title) return String(parsed.title).trim();
+  }
+
+  throw new Error('Could not generate title from AI.');
 }
 
 /**
@@ -211,7 +230,7 @@ async function invokeSupabaseFunction(slug, bodyPayload, timeoutMs = 95000) {
   } catch (err) {
     if (err.name === 'AbortError') {
       throw new Error(
-        `Request timed out after ${Math.round(timeoutMs / 1000)} seconds. Try retrying or choosing another Gemini model.`
+        `Request timed out after ${Math.round(timeoutMs / 1000)} seconds. Please try again.`
       );
     }
     throw err;
@@ -293,7 +312,7 @@ async function callDirectGeminiApi({
     }
   }
 
-  throw lastError || new Error('All Gemini models failed to respond.');
+  throw lastError || new Error('The AI service is temporarily unavailable. Please try again.');
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +349,7 @@ export async function estimateDurationWithAI({ goal, model = DEFAULT_BLUEPRINT_M
         return {
           recommended_months: Math.min(24, Math.max(1, Math.round(data.recommended_months))),
           reasoning: data.reasoning || 'Estimated based on subject breadth and practical cadence.',
-          model_used: 'gemini-2.5-flash',
+          model_used: 'gemini-3.5-flash',
         };
       }
     } catch (edgeErr) {
@@ -358,7 +377,7 @@ Return ONLY valid JSON with this exact structure:
 
   const parsed = safeParseJson(text);
   if (!parsed || typeof parsed.recommended_months !== 'number') {
-    throw new Error('Invalid response from Gemini: could not parse duration estimate.');
+    throw new Error('Could not parse duration estimate. Please try again.');
   }
 
   return {
@@ -645,7 +664,7 @@ async function executeCompileChunk({
   if (proxyError) {
     if (proxyError.status === 429 || /quota|rate.?limit/i.test(proxyError.message)) {
       throw new Error(
-        'Gemini API quota or rate limit reached. Try switching to another Gemini model and retry.'
+        'The AI service is temporarily busy. Please wait a moment and retry.'
       );
     }
     throw proxyError;
@@ -693,14 +712,12 @@ export async function generateRoadmapWithAI({
       milestoneCount: expectedCount,
     });
 
-    const modelsToTry = buildModelChain(model);
     let lastErr = null;
 
-    for (let attempt = 0; attempt < Math.min(2, modelsToTry.length); attempt++) {
-      const attemptModel = modelsToTry[attempt];
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
         if (onProgress && attempt > 0) {
-          onProgress(`Retrying with ${attemptModel} to guarantee all ${expectedCount} milestones…`);
+          onProgress(`Refining timeline to guarantee all ${expectedCount} milestones…`);
         }
 
         const effectivePrompt =
@@ -715,7 +732,7 @@ export async function generateRoadmapWithAI({
           milestoneCount: expectedCount,
           prompt: effectivePrompt,
           systemInstruction,
-          model: attemptModel,
+          model,
         });
 
         result = validateAndNormalizeBlueprintResponse(data, {
@@ -723,11 +740,15 @@ export async function generateRoadmapWithAI({
           durationMonths: resolvedMonths,
           milestoneCount: expectedCount,
         });
-        result.model_used = modelUsed || attemptModel;
+        result.model_used = modelUsed || model;
         break;
       } catch (err) {
         lastErr = err;
-        console.warn(`[blueprint] Compilation attempt ${attempt + 1} (${attemptModel}) failed:`, err.message);
+        console.warn(`[blueprint] Compilation attempt ${attempt + 1} notice:`, err.message);
+        // Only auto-retry on exact count / parse mismatch; don't double-call on hard API errors
+        if (err?.code !== 'MILESTONE_COUNT_MISMATCH' && !(err instanceof SyntaxError)) {
+          throw err;
+        }
       }
     }
 
@@ -735,78 +756,92 @@ export async function generateRoadmapWithAI({
       throw lastErr || new Error('Failed to compile course blueprint.');
     }
   } else {
-    let combinedOverview = null;
-    const combinedMilestones = [];
-    let modelUsedFinal = model;
-    let offset = 1;
+    // Batch 1 builds overview + first chunk; remaining batches compile in parallel
+    const firstCount = Math.min(CHUNK_SIZE, expectedCount);
+    if (onProgress) {
+      onProgress(`Compiling milestones 1–${firstCount} of ${expectedCount}…`);
+    }
 
-    while (offset <= expectedCount) {
-      const count = Math.min(CHUNK_SIZE, expectedCount - offset + 1);
-      if (onProgress) {
-        onProgress(`Compiling milestones ${offset}–${offset + count - 1} of ${expectedCount}…`);
-      }
+    const firstPrompt = buildCompilePrompt({
+      goal: cleanGoal,
+      durationMonths: resolvedMonths,
+      pacing: resolvedPacing,
+      milestoneCount: expectedCount,
+      startOffset: 1,
+      chunkCount: firstCount,
+    });
 
-      const prompt = buildCompilePrompt({
-        goal: cleanGoal,
-        durationMonths: resolvedMonths,
-        pacing: resolvedPacing,
-        milestoneCount: expectedCount,
-        startOffset: offset,
-        chunkCount: count,
-        existingOverview: combinedOverview,
-        previousTitles: combinedMilestones.map((m) => m.title),
-      });
+    const { data: firstData, modelUsed: firstModelUsed } = await executeCompileChunk({
+      goal: cleanGoal,
+      durationMonths: resolvedMonths,
+      pacing: resolvedPacing,
+      milestoneCount: firstCount,
+      prompt: firstPrompt,
+      systemInstruction,
+      model,
+    });
 
-      let chunkResult = null;
-      let lastChunkErr = null;
+    if (!firstData?.milestones || firstData.milestones.length !== firstCount) {
+      throw new Error(
+        `Initial batch returned ${firstData?.milestones?.length || 0} milestones instead of ${firstCount}. Please retry.`
+      );
+    }
 
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const attemptModel = attempt === 0 ? model : buildModelChain(model)[1] || model;
-        try {
-          const { data, modelUsed } = await executeCompileChunk({
-            goal: cleanGoal,
-            durationMonths: resolvedMonths,
-            pacing: resolvedPacing,
-            milestoneCount: count,
-            prompt:
-              attempt === 0
-                ? prompt
-                : `${prompt}\n\nIMPORTANT: Output EXACTLY ${count} milestones with offsets ${offset}..${offset + count - 1}.`,
-            systemInstruction,
-            model: attemptModel,
-          });
+    const combinedOverview = firstData.overview;
+    const modelUsedFinal = firstModelUsed || model;
+    const combinedMilestones = firstData.milestones.map((m, idx) => ({
+      ...m,
+      estimated_week_offset: idx + 1,
+    }));
 
-          if (!data?.milestones || data.milestones.length !== count) {
-            throw new Error(
-              `Batch ${offset}-${offset + count - 1} returned ${data?.milestones?.length || 0} milestones instead of ${count}.`
-            );
-          }
+    const batchSpecs = [];
+    for (let offset = firstCount + 1; offset <= expectedCount; offset += CHUNK_SIZE) {
+      batchSpecs.push({ offset, count: Math.min(CHUNK_SIZE, expectedCount - offset + 1) });
+    }
 
-          chunkResult = data;
-          if (modelUsed) modelUsedFinal = modelUsed;
-          break;
-        } catch (err) {
-          lastChunkErr = err;
+    if (batchSpecs.length > 0 && onProgress) {
+      onProgress(`Compiling remaining milestones (${firstCount + 1}–${expectedCount}) in parallel…`);
+    }
+
+    const remainingResults = await Promise.all(
+      batchSpecs.map(async ({ offset, count }) => {
+        const prompt = buildCompilePrompt({
+          goal: cleanGoal,
+          durationMonths: resolvedMonths,
+          pacing: resolvedPacing,
+          milestoneCount: expectedCount,
+          startOffset: offset,
+          chunkCount: count,
+          existingOverview: combinedOverview,
+          previousTitles: combinedMilestones.map((m) => m.title),
+        });
+
+        const { data } = await executeCompileChunk({
+          goal: cleanGoal,
+          durationMonths: resolvedMonths,
+          pacing: resolvedPacing,
+          milestoneCount: count,
+          prompt,
+          systemInstruction,
+          model,
+        });
+
+        if (!data?.milestones || data.milestones.length !== count) {
+          throw new Error(
+            `Batch ${offset}–${offset + count - 1} returned ${data?.milestones?.length || 0} milestones instead of ${count}.`
+          );
         }
-      }
 
-      if (!chunkResult) {
-        throw lastChunkErr || new Error(`Failed compiling milestones ${offset}–${offset + count - 1}.`);
-      }
-
-      if (offset === 1 && chunkResult.overview) {
-        combinedOverview = chunkResult.overview;
-      }
-
-      chunkResult.milestones.forEach((m, idx) => {
-        combinedMilestones.push({
+        return data.milestones.map((m, idx) => ({
           ...m,
           estimated_week_offset: offset + idx,
-        });
-      });
+        }));
+      })
+    );
 
-      offset += count;
-    }
+    remainingResults.forEach((batchList) => {
+      combinedMilestones.push(...batchList);
+    });
 
     result = validateAndNormalizeBlueprintResponse(
       { overview: combinedOverview, milestones: combinedMilestones },
@@ -848,7 +883,7 @@ async function invokeLegacyGeminiAction(action, payload) {
     try {
       if (action === 'chat') {
         const { messages, roadmap_title, goal_summary, active_milestone, persona, model, gemini_model } = payload;
-        const resolvedModel = model || gemini_model || 'gemini-2.5-flash';
+        const resolvedModel = model || gemini_model || 'gemini-3.5-flash';
         const personaInstructions = {
           tutor: 'Act as a Socratic Tutor: ask probing questions, guide step-by-step, explain conceptual mental models.',
           coach: 'Act as a Strict Accountability Coach: focus on implementation, zero excuses, high standards, timeboxing.',

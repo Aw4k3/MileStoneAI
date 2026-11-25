@@ -1,5 +1,5 @@
 // src/pages/WizardPage.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -14,18 +14,16 @@ import {
   AlertTriangle,
   RefreshCw,
   Brain,
-  Cpu,
   Pencil,
+  Loader2,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Spinner from '../components/common/Spinner';
 import { useRoadmaps } from '../hooks/useRoadmaps';
 import {
-  DEFAULT_BLUEPRINT_MODEL,
-  BLUEPRINT_MODELS,
   generateRoadmapWithAI,
   estimateDurationWithAI,
-  deriveNiceBlueprintTitle,
+  generateBlueprintTitleWithAI,
 } from '../lib/gemini';
 import {
   PACING_OPTIONS,
@@ -46,7 +44,7 @@ const LOADING_TIPS = [
   'Researching courses, tutorials, and official documentation…',
   'Sequencing milestones from fundamentals to hands-on builds…',
   'Designing practical exercises and measurable deliverables…',
-  'Validating milestone timeline and resource quality…',
+  'Finalizing your milestone timeline and resource checklist…',
 ];
 
 export default function WizardPage() {
@@ -60,9 +58,9 @@ export default function WizardPage() {
   const [goal, setGoal] = useState('');
   const [courseTitle, setCourseTitle] = useState('');
   const [hasCustomTitle, setHasCustomTitle] = useState(false);
+  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [durationMonths, setDurationMonths] = useState(3);
   const [pacing, setPacing] = useState('weekly');
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_BLUEPRINT_MODEL);
   const [overloadAutoSwitched, setOverloadAutoSwitched] = useState(false);
 
   // AI Duration Estimator state
@@ -76,6 +74,12 @@ export default function WizardPage() {
   const [tipIndex, setTipIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const tipTimerRef = useRef(null);
+  const lastTitledGoalRef = useRef('');
+  const hasCustomTitleRef = useRef(false);
+
+  useEffect(() => {
+    hasCustomTitleRef.current = hasCustomTitle;
+  }, [hasCustomTitle]);
 
   useEffect(() => {
     const goalParam = searchParams.get('goal');
@@ -83,13 +87,6 @@ export default function WizardPage() {
       setGoal(goalParam);
     }
   }, [searchParams]);
-
-  // Keep a clean simple title ready when entering Review if user hasn't customized one
-  useEffect(() => {
-    if (!hasCustomTitle) {
-      setCourseTitle(deriveNiceBlueprintTitle(goal));
-    }
-  }, [goal, hasCustomTitle]);
 
   useEffect(() => {
     if (isGenerating) {
@@ -103,8 +100,45 @@ export default function WizardPage() {
     return () => clearInterval(tipTimerRef.current);
   }, [isGenerating]);
 
+  const fetchAiTitle = useCallback(async (targetGoal) => {
+    const clean = String(targetGoal || '').trim();
+    if (!clean) return;
+    if (lastTitledGoalRef.current === clean) return;
+
+    lastTitledGoalRef.current = clean;
+    setIsGeneratingTitle(true);
+    try {
+      const aiTitle = await generateBlueprintTitleWithAI({ goal: clean });
+      if (aiTitle && !hasCustomTitleRef.current && lastTitledGoalRef.current === clean) {
+        setCourseTitle(aiTitle);
+      }
+    } catch (err) {
+      console.warn('Title generation notice:', err.message);
+      lastTitledGoalRef.current = '';
+    } finally {
+      setIsGeneratingTitle(false);
+    }
+  }, []);
+
+  // Ensure title is fetched if landing directly on Review step without custom edit
+  useEffect(() => {
+    if (step === 3 && goal.trim() && !hasCustomTitle && !courseTitle.trim() && !isGeneratingTitle) {
+      fetchAiTitle(goal);
+    }
+  }, [step, goal, hasCustomTitle, courseTitle, isGeneratingTitle, fetchAiTitle]);
+
   const automatedMilestones = calculateMilestones(durationMonths, pacing);
   const isOverloadRestricted = durationMonths >= 12;
+
+  const handleContinueFromGoal = () => {
+    const clean = goal.trim();
+    if (!clean) return;
+    if (!hasCustomTitle && lastTitledGoalRef.current !== clean) {
+      setCourseTitle('');
+      fetchAiTitle(clean);
+    }
+    setStep(1);
+  };
 
   const handleSelectDuration = (months) => {
     const cleanMonths = Math.min(24, Math.max(1, Number(months) || 1));
@@ -131,14 +165,11 @@ export default function WizardPage() {
     setEstimateError('');
     setAiDurationSuggestion(null);
     try {
-      const res = await estimateDurationWithAI({
-        goal: goal.trim(),
-        model: selectedModel,
-      });
+      const res = await estimateDurationWithAI({ goal: goal.trim() });
       if (res?.recommended_months) {
         setAiDurationSuggestion(res);
       } else {
-        throw new Error('Could not parse duration recommendation.');
+        throw new Error('Could not determine duration recommendation.');
       }
     } catch (err) {
       setEstimateError(err.message || 'Unable to estimate duration right now. Please try again.');
@@ -152,34 +183,26 @@ export default function WizardPage() {
     handleSelectDuration(aiDurationSuggestion.recommended_months);
   };
 
-  const handleGenerate = async (overrideModel = null) => {
-    const modelToUse = overrideModel || selectedModel;
-    if (overrideModel) {
-      setSelectedModel(overrideModel);
-    }
-
+  const handleGenerate = async () => {
     setIsGenerating(true);
     setErrorMessage('');
-    setGenerationStepText(
-      `Compiling ${automatedMilestones} structured milestones with ${modelToUse}…`
-    );
+    setGenerationStepText(`Creating your ${automatedMilestones}-milestone course blueprint…`);
 
     try {
       const aiData = await generateRoadmapWithAI({
         goal: goal.trim(),
-        titleOverride: hasCustomTitle ? courseTitle.trim() : '',
+        titleOverride: courseTitle.trim(),
         durationMonths,
         pacing,
         milestoneCount: automatedMilestones,
-        model: modelToUse,
         onProgress: (msg) => setGenerationStepText(msg),
       });
 
       const finalTitle =
-        (hasCustomTitle && courseTitle.trim()) ||
+        courseTitle.trim() ||
         (aiData?.overview?.ai_title || '').trim() ||
         aiData?.title ||
-        deriveNiceBlueprintTitle(goal);
+        goal.trim();
 
       const created = await createRoadmap({
         title: finalTitle,
@@ -189,8 +212,8 @@ export default function WizardPage() {
         estimated_duration_weeks: aiData?.estimated_duration_weeks,
         pacing,
         key_outcomes: aiData?.key_outcomes || aiData?.overview?.expected_outcomes || [],
-        gemini_model: String(aiData?.model_used || modelToUse).includes('pro') ? 'pro' : 'flash',
-        ai_model: aiData?.model_used || modelToUse,
+        gemini_model: String(aiData?.model_used || '').includes('pro') ? 'pro' : 'flash',
+        ai_model: aiData?.model_used || 'auto',
         milestones: aiData?.milestones || [],
       });
 
@@ -200,7 +223,7 @@ export default function WizardPage() {
       console.error('Blueprint compilation error:', err);
       setIsGenerating(false);
       setErrorMessage(
-        err.message || 'Failed to compile blueprint. Your settings are preserved — please retry or try another model.'
+        err.message || 'Could not generate your blueprint right now. Your settings are saved—please retry.'
       );
     }
   };
@@ -270,7 +293,7 @@ export default function WizardPage() {
         {/* Wizard Step Card */}
         <div className="p-6 sm:p-8 rounded-2xl bg-[#121824] border border-[#242f42] relative shadow-xl">
           <AnimatePresence mode="wait">
-            {/* STEP 0: Goal Input Only (Clean, no templates, no Suggest Formal Titles) */}
+            {/* STEP 0: Goal Input */}
             {step === 0 && (
               <motion.div
                 key="step-0"
@@ -286,7 +309,7 @@ export default function WizardPage() {
                     What do you want to master?
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                    Describe what you want to learn in plain language. Gemini will research real courses, documentation, exercises, and projects tailored to your timeline.
+                    Describe what you want to learn in plain language. We&apos;ll organize real courses, documentation, exercises, and projects around your schedule.
                   </p>
                 </div>
 
@@ -307,7 +330,7 @@ export default function WizardPage() {
                     className="input-field resize-none text-xs sm:text-sm leading-relaxed"
                   />
                   <p className="text-[11px] text-slate-400">
-                    Tip: Mention your goal scope or stack if applicable — we&apos;ll name and structure your blueprint cleanly next.
+                    Tip: Mention your goal focus or background — AI will automatically create a clean title and curriculum.
                   </p>
                 </div>
 
@@ -315,7 +338,7 @@ export default function WizardPage() {
                   <button
                     type="button"
                     disabled={!goal.trim()}
-                    onClick={() => setStep(1)}
+                    onClick={handleContinueFromGoal}
                     className="btn-primary text-xs py-2.5 px-5 disabled:opacity-50"
                   >
                     Continue to Duration
@@ -341,7 +364,7 @@ export default function WizardPage() {
                     How long do you plan to study?
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                    Pick a duration from 1 to 24 months, or let AI estimate a realistic completion time.
+                    Pick a duration from 1 to 24 months, or let AI recommend a realistic completion timeframe.
                   </p>
                 </div>
 
@@ -419,7 +442,7 @@ export default function WizardPage() {
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-semibold text-blue-300 flex items-center gap-1.5 font-mono">
                         <Brain className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
-                        AI Recommendation: {aiDurationSuggestion.recommended_months}{' '}
+                        Recommended Duration: {aiDurationSuggestion.recommended_months}{' '}
                         {aiDurationSuggestion.recommended_months === 1 ? 'Month' : 'Months'}
                       </span>
                       <button
@@ -487,7 +510,7 @@ export default function WizardPage() {
               </motion.div>
             )}
 
-            {/* STEP 2: Milestone Frequency + Overload Protection + Real-time Count */}
+            {/* STEP 2: Milestone Frequency + Overload Protection */}
             {step === 2 && (
               <motion.div
                 key="step-2"
@@ -629,7 +652,7 @@ export default function WizardPage() {
               </motion.div>
             )}
 
-            {/* STEP 3: Review Your Course Blueprint (Simple clean naming + AI Model + Compile) */}
+            {/* STEP 3: Review Your Course Blueprint (Gemini Title + Summary + Clean Generate) */}
             {step === 3 && (
               <motion.div
                 key="step-3"
@@ -645,11 +668,11 @@ export default function WizardPage() {
                     Review Your Course Blueprint
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                    Name your blueprint cleanly below (or let AI assign a concise title), verify your timeline, and generate your roadmap.
+                    Review your AI-named blueprint title and schedule below, then generate your roadmap.
                   </p>
                 </div>
 
-                {/* Blueprint Title Input (Simple, nice naming right in Review phase) */}
+                {/* AI-Generated Blueprint Title Input */}
                 <div className="p-4 sm:p-5 rounded-2xl bg-[#0e141f] border border-[#1e293b] space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <label
@@ -659,20 +682,27 @@ export default function WizardPage() {
                       <Pencil className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
                       Blueprint Title
                     </label>
-                    {hasCustomTitle ? (
+                    {isGeneratingTitle ? (
+                      <span className="text-[11px] font-mono text-blue-400 flex items-center gap-1.5">
+                        <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+                        Naming blueprint…
+                      </span>
+                    ) : hasCustomTitle ? (
                       <button
                         type="button"
                         onClick={() => {
                           setHasCustomTitle(false);
-                          setCourseTitle(deriveNiceBlueprintTitle(goal));
+                          lastTitledGoalRef.current = '';
+                          setCourseTitle('');
+                          fetchAiTitle(goal);
                         }}
                         className="text-[11px] font-mono text-blue-400 hover:text-blue-300"
                       >
-                        Reset to auto title
+                        Regenerate AI title
                       </button>
                     ) : (
                       <span className="text-[11px] font-mono text-slate-400">
-                        Auto-named · Editable
+                        AI Generated · Editable
                       </span>
                     )}
                   </div>
@@ -684,7 +714,11 @@ export default function WizardPage() {
                       setHasCustomTitle(true);
                       setCourseTitle(e.target.value);
                     }}
-                    placeholder={deriveNiceBlueprintTitle(goal)}
+                    placeholder={
+                      isGeneratingTitle
+                        ? 'Generating clean title…'
+                        : 'Generated automatically if left blank'
+                    }
                     className="input-field text-sm font-semibold py-2.5"
                   />
                 </div>
@@ -722,74 +756,22 @@ export default function WizardPage() {
                   </div>
                 </div>
 
-                {/* Gemini Model Switcher */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-[#0e141f] border border-[#1e293b] space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                      <Cpu className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
-                      Gemini AI Model
-                    </span>
-                    <span className="text-[11px] font-mono text-slate-400">
-                      Automatic failover active
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {BLUEPRINT_MODELS.map((m) => {
-                      const active = selectedModel === m.value;
-                      return (
-                        <button
-                          key={m.value}
-                          type="button"
-                          onClick={() => setSelectedModel(m.value)}
-                          className={`p-2.5 rounded-xl border text-left transition-colors ${
-                            active
-                              ? 'bg-blue-600/15 border-blue-500 text-white'
-                              : 'bg-[#121824] border-[#242f42] text-slate-300 hover:border-slate-500'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-semibold">{m.label}</span>
-                            <span className="text-[10px] font-mono text-blue-400">{m.value}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Error + Retry + Model Switch */}
+                {/* Clean Error & Retry Alert (No internal AI model details) */}
                 {errorMessage && (
-                  <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-3" role="alert">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" aria-hidden="true" />
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-rose-300">Blueprint Generation Error</p>
-                        <p className="text-xs text-slate-300 mt-1 leading-relaxed">{errorMessage}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleGenerate()}
-                        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 text-white hover:bg-rose-500"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
-                        Retry
-                      </button>
+                  <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-3" role="alert">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" aria-hidden="true" />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-rose-300">Unable to Compile Blueprint</p>
+                      <p className="text-xs text-slate-300 mt-1 leading-relaxed">{errorMessage}</p>
                     </div>
-                    <div className="pt-2 border-t border-rose-500/20 flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] font-mono text-slate-400">
-                        Switch model &amp; retry:
-                      </span>
-                      {BLUEPRINT_MODELS.filter((m) => m.value !== selectedModel).map((m) => (
-                        <button
-                          key={m.value}
-                          type="button"
-                          onClick={() => handleGenerate(m.value)}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-[#121824] border border-[#242f42] text-slate-200 hover:border-blue-500/50 hover:text-blue-300"
-                        >
-                          {m.label}
-                        </button>
-                      ))}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGenerate}
+                      className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 text-white hover:bg-rose-500"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+                      Retry
+                    </button>
                   </div>
                 )}
 
@@ -816,7 +798,7 @@ export default function WizardPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleGenerate()}
+                      onClick={handleGenerate}
                       className="btn-primary text-xs py-2.5 px-6 font-semibold inline-flex items-center gap-2"
                     >
                       <Sparkles className="w-4 h-4 text-blue-200" aria-hidden="true" />
