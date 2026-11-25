@@ -11,7 +11,6 @@ import {
   Clock,
   Compass,
   Trash2,
-  Zap,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import ProgressRing from '../components/common/ProgressRing';
@@ -19,30 +18,16 @@ import Spinner from '../components/common/Spinner';
 import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useRoadmaps } from '../hooks/useRoadmaps';
-import { usePathways } from '../hooks/usePathways';
 import { useStats } from '../hooks/useStats';
-
-const STARTER_SUGGESTIONS = [
-  'Full-Stack Machine Learning Engineering',
-  'Rust Systems & Microservices',
-  'Distributed Systems in Go',
-];
-
-const PATHWAY_DIFFICULTY_STYLES = {
-  Beginner: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  Intermediate: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  Advanced: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-};
+import { getPacingLabel } from '../lib/constants';
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { roadmaps, milestonesMap, loading: roadmapsLoading, deleteRoadmap } = useRoadmaps();
-  const { pathways, loading: pathwaysLoading, removePathway } = usePathways();
   const { stats, loading: statsLoading } = useStats();
 
   const [blueprintToDelete, setBlueprintToDelete] = useState(null);
-  const [pathwayToDelete, setPathwayToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
@@ -78,15 +63,10 @@ export default function DashboardPage() {
     completedMilestonesCount += list.filter((m) => m.is_completed).length;
   });
 
-  pathways.forEach((pw) => {
-    const list = pw.milestones || [];
-    totalMilestonesCount += list.length;
-    completedMilestonesCount += list.filter((m) => m.status === 'Completed').length;
-  });
-
-  const globalCompletion = totalMilestonesCount > 0
-    ? Math.round((completedMilestonesCount / totalMilestonesCount) * 100)
-    : 0;
+  const globalCompletion =
+    totalMilestonesCount > 0
+      ? Math.round((completedMilestonesCount / totalMilestonesCount) * 100)
+      : 0;
 
   const activeBlueprint = roadmaps.find((r) => r.status === 'active') || roadmaps[0];
   const activeMilestones = activeBlueprint ? milestonesMap[activeBlueprint.id] || [] : [];
@@ -105,13 +85,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleConfirmDeletePathway = () => {
-    if (!pathwayToDelete) return;
-    removePathway(pathwayToDelete.id);
-    setPathwayToDelete(null);
-  };
-
-  if (authLoading || roadmapsLoading || pathwaysLoading || statsLoading) {
+  if (authLoading || roadmapsLoading || statsLoading) {
     return (
       <Layout>
         <div className="py-24 flex flex-col items-center justify-center space-y-3">
@@ -135,57 +109,57 @@ export default function DashboardPage() {
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
               {isFirstVisit
-                ? 'Create your first structured blueprint or explore the active curriculum milestones below.'
-                : 'Your curriculum milestones and active mentor context are synced and ready.'}
+                ? 'Create your first structured learning blueprint or explore active milestones below.'
+                : 'Your curriculum blueprints and active mentor context are synced and ready.'}
             </p>
           </div>
-          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-            <Link
-              to="/pathway/new"
-              className="btn-secondary self-start sm:self-auto text-xs py-2 px-4 inline-flex items-center gap-2 shadow-sm border-blue-500/40 text-blue-400 hover:text-blue-300"
-            >
-              <Zap className="w-3.5 h-3.5" aria-hidden="true" />
-              AI Pathway
-            </Link>
-            <Link
-              to="/wizard"
-              className="btn-primary self-start sm:self-auto text-xs py-2 px-4 inline-flex items-center gap-2 shadow-sm"
-            >
-              <PlusCircle className="w-3.5 h-3.5" aria-hidden="true" />
-              New Blueprint
-            </Link>
-          </div>
+          <Link
+            to="/wizard"
+            className="btn-primary self-start sm:self-auto text-xs py-2 px-4 inline-flex items-center gap-2 shadow-sm"
+          >
+            <PlusCircle className="w-3.5 h-3.5" aria-hidden="true" />
+            New Blueprint
+          </Link>
         </div>
 
-        {/* Command Metrics Bar with Tabular Figures */}
+        {/* Command Metrics Bar */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-[#121824] border border-[#242f42] rounded-2xl p-4 sm:p-5">
           <div className="space-y-1 pr-4 border-r border-[#1e293b]/80">
-            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Active Plans</span>
+            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+              Active Blueprints
+            </span>
             <p className="text-2xl font-bold font-mono tnum text-white">
-              {roadmaps.filter((r) => r.status === 'active').length + pathways.length}
+              {roadmaps.filter((r) => r.status === 'active').length}
             </p>
           </div>
 
           <div className="space-y-1 sm:pl-4 lg:pr-4 sm:border-r border-[#1e293b]/80">
-            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Current Streak</span>
+            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+              Current Streak
+            </span>
             <p className="text-2xl font-bold font-mono tnum text-amber-400 flex items-center gap-1.5">
               <Flame className="w-4 h-4 fill-amber-400 text-amber-400" aria-hidden="true" />
               {stats?.current_streak || 0}d
             </p>
           </div>
 
-          <div className="space-y-1 lg:pl-4 pr-4 border-r border-[#1e293b]/80">
-            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Earned XP</span>
+          <div className="space-y-1 pr-4 lg:pl-4 border-r border-[#1e293b]/80">
+            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+              Total Earned
+            </span>
             <p className="text-2xl font-bold font-mono tnum text-blue-400">
-              {(stats?.total_xp || 0).toLocaleString()}
+              {(stats?.total_xp || 0).toLocaleString()} XP
             </p>
           </div>
 
           <div className="space-y-1 pl-4 flex items-center justify-between">
             <div>
-              <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Milestones</span>
+              <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+                Milestones
+              </span>
               <p className="text-2xl font-bold font-mono tnum text-white">
-                {completedMilestonesCount}<span className="text-slate-500 text-base">/{totalMilestonesCount}</span>
+                {completedMilestonesCount}
+                <span className="text-slate-500 text-base">/{totalMilestonesCount}</span>
               </p>
             </div>
             <ProgressRing progress={globalCompletion} size={44} strokeWidth={4} />
@@ -198,10 +172,10 @@ export default function DashboardPage() {
             <div className="space-y-2 max-w-xl">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">
-                  Active Curriculum
+                  Active Blueprint
                 </span>
                 <span className="text-xs text-slate-400 font-mono">
-                  {activeBlueprint.duration_months} mo · {activeBlueprint.pacing} pacing
+                  {activeBlueprint.duration_months} mo · {getPacingLabel(activeBlueprint.pacing)}
                 </span>
               </div>
               <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
@@ -242,109 +216,14 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* AI Compiled Pathways Section */}
-        {pathways.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Zap className="w-4 h-4 text-blue-400" aria-hidden="true" />
-                AI Learning Pathways
-              </h2>
-              <span className="text-xs font-mono text-slate-400 tnum">
-                {pathways.length} compiled
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pathways.map((pw) => {
-                const pwMilestones = pw.milestones || [];
-                const pwDone = pwMilestones.filter((m) => m.status === 'Completed').length;
-                const pwPercent =
-                  pwMilestones.length > 0 ? Math.round((pwDone / pwMilestones.length) * 100) : 0;
-                const pwOverview = pw.overview || {};
-                const pwTitle = (pwOverview.ai_title || '').trim() || pw.title || pw.goal;
-                const pwDiff = pwOverview.difficulty_level || 'Intermediate';
-
-                return (
-                  <Link
-                    key={pw.id}
-                    to={`/pathway/${pw.id}`}
-                    className="p-5 rounded-2xl bg-[#121824] border border-[#242f42] hover:border-[#3b4c68] transition-colors flex flex-col justify-between group"
-                  >
-                    <div className="space-y-2.5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1 min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span
-                              className={`px-2 py-0.5 text-[10px] font-mono font-semibold uppercase rounded border ${
-                                PATHWAY_DIFFICULTY_STYLES[pwDiff] || PATHWAY_DIFFICULTY_STYLES.Intermediate
-                              }`}
-                            >
-                              {pwDiff}
-                            </span>
-                            <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
-                              <Calendar className="w-3 h-3" aria-hidden="true" />
-                              {pw.durationMonths} mo · {pw.pacing}
-                            </span>
-                          </div>
-                          <h3 className="text-base font-bold text-white group-hover:text-blue-400 transition-colors line-clamp-1">
-                            {pwTitle}
-                          </h3>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setPathwayToDelete(pw);
-                            }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-colors"
-                            aria-label={`Delete ${pwTitle}`}
-                            title="Delete pathway"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                          </button>
-                          <ProgressRing progress={pwPercent} size={40} strokeWidth={4} />
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
-                        {pwOverview.goal_summary || pw.goal}
-                      </p>
-                    </div>
-
-                    <div className="pt-4 mt-4 border-t border-[#1e293b] flex items-center justify-between text-xs text-slate-400">
-                      <span className="flex items-center gap-1.5 font-mono text-[11px] tnum">
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            pwPercent === 100 && pwMilestones.length > 0 ? 'bg-emerald-400' : 'bg-blue-400'
-                          }`}
-                        />
-                        {pwDone} of {pwMilestones.length} milestones complete
-                      </span>
-                      <span className="text-blue-400 flex items-center gap-0.5 font-medium group-hover:translate-x-0.5 transition-transform">
-                        Open Pathway <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Roadmaps List Section */}
+        {/* Unified Blueprints Grid */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <Layers className="w-4 h-4 text-blue-400" aria-hidden="true" />
               Your Blueprints
             </h2>
-            <span className="text-xs font-mono text-slate-400 tnum">
-              {roadmaps.length} total
-            </span>
+            <span className="text-xs font-mono text-slate-400 tnum">{roadmaps.length} total</span>
           </div>
 
           {roadmaps.length === 0 ? (
@@ -353,29 +232,18 @@ export default function DashboardPage() {
                 <Compass className="w-6 h-6" aria-hidden="true" />
               </div>
               <div className="space-y-1.5 max-w-sm mx-auto">
-                <h3 className="text-base font-bold text-white">No Blueprints Formulated Yet</h3>
+                <h3 className="text-base font-bold text-white">No Blueprints Created Yet</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Enter your goal to generate a sequenced curriculum with verified deliverables and an AI mentor.
+                  Enter any learning goal to generate a structured course blueprint with real educational resources, exercises, projects, and an AI mentor.
                 </p>
               </div>
-
-              {/* Starter Suggestions */}
-              <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-                {STARTER_SUGGESTIONS.map((s) => (
-                  <Link
-                    key={s}
-                    to={`/wizard?goal=${encodeURIComponent(s)}`}
-                    className="px-3 py-1.5 rounded-lg bg-[#161f2e] border border-[#242f42] text-xs font-mono text-slate-300 hover:text-white hover:border-blue-500/40 transition-colors"
-                  >
-                    + {s}
-                  </Link>
-                ))}
-              </div>
-
               <div>
-                <Link to="/wizard" className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5">
+                <Link
+                  to="/wizard"
+                  className="btn-primary text-xs py-2.5 px-5 inline-flex items-center gap-1.5"
+                >
                   <PlusCircle className="w-3.5 h-3.5" aria-hidden="true" />
-                  Formulate Blueprint
+                  Create Your First Blueprint
                 </Link>
               </div>
             </div>
@@ -384,9 +252,10 @@ export default function DashboardPage() {
               {roadmaps.map((roadmap) => {
                 const milestones = milestonesMap[roadmap.id] || [];
                 const completedCount = milestones.filter((m) => m.is_completed).length;
-                const percent = milestones.length > 0
-                  ? Math.round((completedCount / milestones.length) * 100)
-                  : 0;
+                const percent =
+                  milestones.length > 0
+                    ? Math.round((completedCount / milestones.length) * 100)
+                    : 0;
 
                 const difficultyStyles = {
                   beginner: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -403,17 +272,17 @@ export default function DashboardPage() {
                     <div className="space-y-2.5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1 min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span
                               className={`px-2 py-0.5 text-[10px] font-mono font-semibold uppercase rounded border ${
-                                difficultyStyles[roadmap.difficulty] || difficultyStyles.beginner
+                                difficultyStyles[roadmap.difficulty] || difficultyStyles.intermediate
                               }`}
                             >
                               {roadmap.difficulty}
                             </span>
                             <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
                               <Calendar className="w-3 h-3" aria-hidden="true" />
-                              {roadmap.duration_months} mo · {roadmap.pacing}
+                              {roadmap.duration_months} mo · {getPacingLabel(roadmap.pacing)}
                             </span>
                           </div>
                           <h3 className="text-base font-bold text-white group-hover:text-blue-400 transition-colors line-clamp-1">
@@ -446,11 +315,17 @@ export default function DashboardPage() {
 
                     <div className="pt-4 mt-4 border-t border-[#1e293b] flex items-center justify-between text-xs text-slate-400">
                       <span className="flex items-center gap-1.5 font-mono text-[11px] tnum">
-                        <span className={`w-1.5 h-1.5 rounded-full ${roadmap.status === 'completed' ? 'bg-emerald-400' : 'bg-blue-400'}`} />
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            roadmap.status === 'completed' || (percent === 100 && milestones.length > 0)
+                              ? 'bg-emerald-400'
+                              : 'bg-blue-400'
+                          }`}
+                        />
                         {completedCount} of {milestones.length} milestones complete
                       </span>
                       <span className="text-blue-400 flex items-center gap-0.5 font-medium group-hover:translate-x-0.5 transition-transform">
-                        View Plan <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                        View Blueprint <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
                       </span>
                     </div>
                   </Link>
@@ -498,7 +373,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Delete Confirmation Dialogs */}
+        {/* Delete Confirmation Dialog */}
         <DeleteConfirmModal
           isOpen={!!blueprintToDelete}
           onClose={() => setBlueprintToDelete(null)}
@@ -506,13 +381,6 @@ export default function DashboardPage() {
           itemTitle={blueprintToDelete?.title || ''}
           itemType="Blueprint"
           isDeleting={isDeleting}
-        />
-        <DeleteConfirmModal
-          isOpen={!!pathwayToDelete}
-          onClose={() => setPathwayToDelete(null)}
-          onConfirm={handleConfirmDeletePathway}
-          itemTitle={pathwayToDelete?.overview?.ai_title || pathwayToDelete?.title || pathwayToDelete?.goal || ''}
-          itemType="Pathway"
         />
       </div>
     </Layout>

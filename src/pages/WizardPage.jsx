@@ -1,67 +1,82 @@
 // src/pages/WizardPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight,
   ArrowLeft,
   Target,
-  Wand2,
-  Check,
   Calendar,
   Sparkles,
   Layers,
   Clock,
   CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Brain,
+  Cpu,
+  Pencil,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Spinner from '../components/common/Spinner';
 import { useRoadmaps } from '../hooks/useRoadmaps';
 import {
+  DEFAULT_BLUEPRINT_MODEL,
+  BLUEPRINT_MODELS,
   generateRoadmapWithAI,
   estimateDurationWithAI,
-  suggestTitlesWithAI,
+  deriveNiceBlueprintTitle,
 } from '../lib/gemini';
-import { PACING_OPTIONS, calculateMilestones } from '../lib/constants';
+import {
+  PACING_OPTIONS,
+  calculateMilestones,
+  getPacingLabel,
+} from '../lib/constants';
 
 const STEPS = [
-  { id: 0, label: 'Goal & Title', short: '01' },
+  { id: 0, label: 'Learning Goal', short: '01' },
   { id: 1, label: 'Course Duration', short: '02' },
   { id: 2, label: 'Milestone Frequency', short: '03' },
   { id: 3, label: 'Review & Generate', short: '04' },
 ];
 
-const DURATION_PRESETS = [3, 6, 12, 24];
+const DURATION_PRESETS = [1, 3, 6, 12, 24];
+
+const LOADING_TIPS = [
+  'Researching courses, tutorials, and official documentation…',
+  'Sequencing milestones from fundamentals to hands-on builds…',
+  'Designing practical exercises and measurable deliverables…',
+  'Validating milestone timeline and resource quality…',
+];
 
 export default function WizardPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { createRoadmap } = useRoadmaps();
 
-  // Wizard Step (0 to 3)
   const [step, setStep] = useState(0);
 
-  // Form State (Preserved across all navigation steps)
+  // Preserved user configuration state across steps and retries
   const [goal, setGoal] = useState('');
   const [courseTitle, setCourseTitle] = useState('');
-  const [durationMonths, setDurationMonths] = useState(12);
-  const [pacing, setPacing] = useState('monthly');
+  const [hasCustomTitle, setHasCustomTitle] = useState(false);
+  const [durationMonths, setDurationMonths] = useState(3);
+  const [pacing, setPacing] = useState('weekly');
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_BLUEPRINT_MODEL);
+  const [overloadAutoSwitched, setOverloadAutoSwitched] = useState(false);
 
-  // AI Title Suggestions State (Multi-selection supported)
-  const [suggestedTitles, setSuggestedTitles] = useState([]);
-  const [selectedTitles, setSelectedTitles] = useState([]);
-  const [isSuggestingTitles, setIsSuggestingTitles] = useState(false);
-
-  // AI Duration Estimation State
+  // AI Duration Estimator state
   const [isEstimatingDuration, setIsEstimatingDuration] = useState(false);
   const [aiDurationSuggestion, setAiDurationSuggestion] = useState(null);
+  const [estimateError, setEstimateError] = useState('');
 
-  // AI Generation Loading State
+  // Compilation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStepText, setGenerationStepText] = useState('');
+  const [tipIndex, setTipIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
+  const tipTimerRef = useRef(null);
 
-  // Prepopulate goal from URL params if present
   useEffect(() => {
     const goalParam = searchParams.get('goal');
     if (goalParam && !goal) {
@@ -69,160 +84,133 @@ export default function WizardPage() {
     }
   }, [searchParams]);
 
-  // Automated Milestone Count dynamically derived from duration and pacing
-  const automatedMilestones = calculateMilestones(durationMonths, pacing);
-
-  // Suggest short, clear, professional course titles
-  const handleSuggestTitles = async () => {
-    if (!goal.trim()) return;
-    setIsSuggestingTitles(true);
-    setErrorMessage('');
-    try {
-      const res = await suggestTitlesWithAI({ goal: goal.trim() });
-      if (res?.titles && Array.isArray(res.titles) && res.titles.length > 0) {
-        setSuggestedTitles(res.titles);
-      }
-    } catch (err) {
-      console.warn('Title suggestion notice:', err.message);
-    } finally {
-      setIsSuggestingTitles(false);
+  // Keep a clean simple title ready when entering Review if user hasn't customized one
+  useEffect(() => {
+    if (!hasCustomTitle) {
+      setCourseTitle(deriveNiceBlueprintTitle(goal));
     }
-  };
+  }, [goal, hasCustomTitle]);
 
-  // Toggle selection / deselection of suggested titles (Multi-select)
-  const handleToggleTitle = (title) => {
-    if (selectedTitles.includes(title)) {
-      // Deselect
-      const updated = selectedTitles.filter((t) => t !== title);
-      setSelectedTitles(updated);
-      if (courseTitle === title) {
-        setCourseTitle(updated.length > 0 ? updated[updated.length - 1] : '');
-      }
+  useEffect(() => {
+    if (isGenerating) {
+      tipTimerRef.current = setInterval(() => {
+        setTipIndex((i) => (i + 1) % LOADING_TIPS.length);
+      }, 3000);
     } else {
-      // Select
-      const updated = [...selectedTitles, title];
-      setSelectedTitles(updated);
-      setCourseTitle(title);
+      clearInterval(tipTimerRef.current);
+      setTipIndex(0);
+    }
+    return () => clearInterval(tipTimerRef.current);
+  }, [isGenerating]);
+
+  const automatedMilestones = calculateMilestones(durationMonths, pacing);
+  const isOverloadRestricted = durationMonths >= 12;
+
+  const handleSelectDuration = (months) => {
+    const cleanMonths = Math.min(24, Math.max(1, Number(months) || 1));
+    setDurationMonths(cleanMonths);
+    if (cleanMonths >= 12 && (pacing === 'daily' || pacing === 'every_3_days')) {
+      setPacing('weekly');
+      setOverloadAutoSwitched(true);
+    } else {
+      setOverloadAutoSwitched(false);
     }
   };
 
-  // Estimate duration with Gemini
+  const handleSelectPacing = (nextPacing) => {
+    const disabled =
+      isOverloadRestricted && (nextPacing === 'daily' || nextPacing === 'every_3_days');
+    if (disabled) return;
+    setPacing(nextPacing);
+    setOverloadAutoSwitched(false);
+  };
+
   const handleEstimateDuration = async () => {
     if (!goal.trim()) return;
     setIsEstimatingDuration(true);
+    setEstimateError('');
+    setAiDurationSuggestion(null);
     try {
-      const res = await estimateDurationWithAI({ goal, difficulty: 'intermediate' });
+      const res = await estimateDurationWithAI({
+        goal: goal.trim(),
+        model: selectedModel,
+      });
       if (res?.recommended_months) {
         setAiDurationSuggestion(res);
+      } else {
+        throw new Error('Could not parse duration recommendation.');
       }
     } catch (err) {
-      console.warn('Duration estimation notice:', err.message);
+      setEstimateError(err.message || 'Unable to estimate duration right now. Please try again.');
     } finally {
       setIsEstimatingDuration(false);
     }
   };
 
   const applyAiRecommendation = () => {
-    if (!aiDurationSuggestion) return;
-    if (aiDurationSuggestion.recommended_months) {
-      setDurationMonths(aiDurationSuggestion.recommended_months);
-    }
-    if (aiDurationSuggestion.recommended_pacing) {
-      setPacing(aiDurationSuggestion.recommended_pacing);
-    }
+    if (!aiDurationSuggestion?.recommended_months) return;
+    handleSelectDuration(aiDurationSuggestion.recommended_months);
   };
 
-  // Final Blueprint Generation
-  const handleGenerate = async () => {
+  const handleGenerate = async (overrideModel = null) => {
+    const modelToUse = overrideModel || selectedModel;
+    if (overrideModel) {
+      setSelectedModel(overrideModel);
+    }
+
     setIsGenerating(true);
     setErrorMessage('');
-    setGenerationStepText('Synthesizing structured curriculum blueprint with Gemini AI…');
-
-    let generatedRoadmapId = null;
+    setGenerationStepText(
+      `Compiling ${automatedMilestones} structured milestones with ${modelToUse}…`
+    );
 
     try {
       const aiData = await generateRoadmapWithAI({
-        goal,
-        difficulty: 'intermediate',
-        duration_months: durationMonths,
+        goal: goal.trim(),
+        titleOverride: hasCustomTitle ? courseTitle.trim() : '',
+        durationMonths,
         pacing,
-        target_milestones: automatedMilestones,
+        milestoneCount: automatedMilestones,
+        model: modelToUse,
+        onProgress: (msg) => setGenerationStepText(msg),
       });
 
-      setGenerationStepText(`Generated ${aiData?.milestones?.length || automatedMilestones} comprehensive milestones with verified resources…`);
-
       const finalTitle =
-        courseTitle.trim() ||
-        (selectedTitles.length > 0 ? selectedTitles[0] : null) ||
+        (hasCustomTitle && courseTitle.trim()) ||
+        (aiData?.overview?.ai_title || '').trim() ||
         aiData?.title ||
-        (goal.length > 50 ? `${goal.slice(0, 48)}…` : goal);
+        deriveNiceBlueprintTitle(goal);
 
       const created = await createRoadmap({
         title: finalTitle,
-        goal_summary: aiData?.goal_summary || goal,
-        difficulty: 'intermediate',
+        goal_summary: aiData?.goal_summary || aiData?.overview?.goal_summary || goal.trim(),
+        difficulty: aiData?.difficulty || 'intermediate',
         duration_months: durationMonths,
+        estimated_duration_weeks: aiData?.estimated_duration_weeks,
         pacing,
-        key_outcomes: aiData?.key_outcomes || [
-          'Master core foundational architecture and practical skills',
-          'Build, verify, and test decoupled production deliverables',
-          'Deploy verified milestone capstones with automated testing',
-        ],
+        key_outcomes: aiData?.key_outcomes || aiData?.overview?.expected_outcomes || [],
+        gemini_model: String(aiData?.model_used || modelToUse).includes('pro') ? 'pro' : 'flash',
+        ai_model: aiData?.model_used || modelToUse,
         milestones: aiData?.milestones || [],
       });
 
-      generatedRoadmapId = created?.id;
-      setGenerationStepText('Finalizing roadmap records and deliverables…');
-
-      setTimeout(() => {
-        setIsGenerating(false);
-        navigate(`/roadmap/${generatedRoadmapId}`);
-      }, 400);
+      setIsGenerating(false);
+      navigate(`/roadmap/${created.id}`);
     } catch (err) {
-      console.error('Roadmap synthesis error:', err);
-      try {
-        const fallbackTitle =
-          courseTitle.trim() ||
-          (selectedTitles.length > 0 ? selectedTitles[0] : null) ||
-          (goal.length > 50 ? `${goal.slice(0, 48)}…` : goal);
-
-        const fallback = await createRoadmap({
-          title: fallbackTitle,
-          goal_summary: goal,
-          difficulty: 'intermediate',
-          duration_months: durationMonths,
-          pacing,
-          key_outcomes: ['Master core competencies and project deliverables'],
-          milestones: [
-            {
-              title: 'Phase 1: Foundations & Tooling',
-              description: 'Initial setup, mental models, and foundational concepts.',
-              deliverables: ['Setup development workspace', 'Complete introductory practical exercises'],
-              resources: [{ title: 'Official Documentation', url: 'https://developer.mozilla.org', type: 'docs' }],
-            },
-            {
-              title: 'Phase 2: Core Architecture & Implementation',
-              description: 'Build core application features with clean patterns.',
-              deliverables: ['Implement primary domain logic', 'Write verification tests'],
-              resources: [{ title: 'Clean Architecture Guide', url: 'https://martinfowler.com', type: 'book' }],
-            },
-          ],
-        });
-
-        setIsGenerating(false);
-        navigate(`/roadmap/${fallback.id}`);
-      } catch {
-        setIsGenerating(false);
-        setErrorMessage('Failed to generate blueprint. Please try again.');
-      }
+      console.error('Blueprint compilation error:', err);
+      setIsGenerating(false);
+      setErrorMessage(
+        err.message || 'Failed to compile blueprint. Your settings are preserved — please retry or try another model.'
+      );
     }
   };
 
   const getDurationContext = (months) => {
-    if (months <= 3) return 'Sprint Pace — Intensive, focused skill acquisition';
-    if (months <= 6) return 'Standard Track — Comprehensive foundational mastery';
-    if (months <= 12) return 'Year-Long Track — In-depth professional competency';
-    return 'Multi-Year Mastery — Comprehensive senior-level mastery';
+    if (months <= 1) return 'Focused Sprint — Fast foundational immersion';
+    if (months <= 3) return 'Sprint Track — Intensive, structured skill acquisition';
+    if (months <= 6) return 'Standard Track — Balanced proficiency and project builds';
+    if (months <= 12) return 'Year-Long Track — Deep competence across real systems';
+    return 'Multi-Year Mastery — Comprehensive senior-level depth';
   };
 
   return (
@@ -234,12 +222,9 @@ export default function WizardPage() {
             <span className="font-mono text-slate-400 tnum">
               Step <strong className="text-white">{step + 1}</strong> of {STEPS.length}
             </span>
-            <span className="text-slate-400 font-medium">
-              {STEPS[step].label}
-            </span>
+            <span className="text-slate-300 font-medium">{STEPS[step].label}</span>
           </div>
 
-          {/* Progress Bar Track */}
           <div className="w-full h-1.5 bg-[#0e141f] rounded-full overflow-hidden border border-[#1e293b]">
             <motion.div
               className="h-full bg-blue-500 rounded-full"
@@ -249,7 +234,6 @@ export default function WizardPage() {
             />
           </div>
 
-          {/* Step Pill Navigation (Accessible Indicators) */}
           <div className="grid grid-cols-4 gap-2 mt-3">
             {STEPS.map((s, idx) => {
               const isPast = step > idx;
@@ -283,18 +267,10 @@ export default function WizardPage() {
           </div>
         </div>
 
-        {errorMessage && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
-            {errorMessage}
-          </div>
-        )}
-
         {/* Wizard Step Card */}
         <div className="p-6 sm:p-8 rounded-2xl bg-[#121824] border border-[#242f42] relative shadow-xl">
           <AnimatePresence mode="wait">
-            {/* ============================================================ */}
-            {/* STEP 0: Goal Input & Suggest Formal Titles (Multi-select)     */}
-            {/* ============================================================ */}
+            {/* STEP 0: Goal Input Only (Clean, no templates, no Suggest Formal Titles) */}
             {step === 0 && (
               <motion.div
                 key="step-0"
@@ -305,111 +281,36 @@ export default function WizardPage() {
                 className="space-y-6"
               >
                 <div>
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
                     <Target className="w-5 h-5 text-blue-400" aria-hidden="true" />
                     What do you want to master?
-                  </h2>
+                  </h1>
                   <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                    Describe your learning goal in plain language. Gemini will analyze prerequisites and build a sequential milestone path.
+                    Describe what you want to learn in plain language. Gemini will research real courses, documentation, exercises, and projects tailored to your timeline.
                   </p>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <label htmlFor="goal-input" className="block text-xs font-semibold text-slate-300">
-                    Learning Objective
+                    Learning Goal
                   </label>
                   <textarea
                     id="goal-input"
                     name="goal"
                     rows={4}
                     value={goal}
-                    onChange={(e) => setGoal(e.target.value)}
-                    placeholder="e.g. Master Full-Stack Web Development with React, Node.js, and PostgreSQL to build and ship production software…"
+                    onChange={(e) => {
+                      setGoal(e.target.value);
+                      if (estimateError) setEstimateError('');
+                    }}
+                    placeholder="e.g. Learn machine learning with Python, from fundamentals to training and deploying production models…"
                     className="input-field resize-none text-xs sm:text-sm leading-relaxed"
                   />
-                  <div className="flex flex-wrap justify-between items-center gap-2 text-xs">
-                    <span className="text-[11px] text-slate-400">
-                      Define your technology stack, practical craft, or subject
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleSuggestTitles}
-                      disabled={!goal.trim() || isSuggestingTitles}
-                      className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-40 flex items-center gap-1.5 font-medium transition-colors"
-                    >
-                      <Wand2
-                        className={`w-3.5 h-3.5 ${isSuggestingTitles ? 'animate-spin' : ''}`}
-                        aria-hidden="true"
-                      />
-                      {isSuggestingTitles ? 'Generating Titles…' : 'Suggest Formal Titles'}
-                    </button>
-                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Tip: Mention your goal scope or stack if applicable — we&apos;ll name and structure your blueprint cleanly next.
+                  </p>
                 </div>
 
-                {/* AI Title Suggestions with Independent Multi-Select / Deselect */}
-                {suggestedTitles.length > 0 && (
-                  <div className="p-4 rounded-xl bg-[#0e141f] border border-[#1e293b] space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-200">
-                        Suggested Course Titles
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        Click to select or deselect
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {suggestedTitles.map((title) => {
-                        const isSelected = selectedTitles.includes(title);
-                        return (
-                          <button
-                            key={title}
-                            type="button"
-                            onClick={() => handleToggleTitle(title)}
-                            className={`p-3 rounded-xl border text-left text-xs transition-colors flex items-center justify-between gap-2.5 ${
-                              isSelected
-                                ? 'bg-blue-600/15 border-blue-500 text-white font-semibold ring-1 ring-blue-500/40 shadow-xs'
-                                : 'bg-[#121824] border-[#242f42] text-slate-300 hover:border-slate-500'
-                            }`}
-                          >
-                            <span className="truncate">{title}</span>
-                            <div
-                              className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
-                                isSelected
-                                  ? 'bg-blue-600 border-blue-500 text-white'
-                                  : 'border-slate-600 bg-[#0d131d]'
-                              }`}
-                            >
-                              {isSelected && <Check className="w-3 h-3 text-white" aria-hidden="true" />}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Optional Course Title Input */}
-                <div className="space-y-1.5">
-                  <label htmlFor="course-title-input" className="block text-xs font-semibold text-slate-300">
-                    Course Title <span className="text-slate-500 font-normal">(Optional custom title)</span>
-                  </label>
-                  <input
-                    id="course-title-input"
-                    name="courseTitle"
-                    type="text"
-                    value={courseTitle}
-                    onChange={(e) => setCourseTitle(e.target.value)}
-                    placeholder={
-                      selectedTitles.length > 0
-                        ? selectedTitles.join(' & ')
-                        : 'e.g. Modern Full-Stack Web Development'
-                    }
-                    className="input-field text-xs py-2.5"
-                  />
-                </div>
-
-                {/* Step 0 Navigation */}
                 <div className="flex justify-end pt-4 border-t border-[#1e293b]">
                   <button
                     type="button"
@@ -424,9 +325,7 @@ export default function WizardPage() {
               </motion.div>
             )}
 
-            {/* ============================================================ */}
-            {/* STEP 1: Course Duration (1 to 24 Months)                      */}
-            {/* ============================================================ */}
+            {/* STEP 1: Course Duration + AI Estimator */}
             {step === 1 && (
               <motion.div
                 key="step-1"
@@ -439,14 +338,13 @@ export default function WizardPage() {
                 <div>
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <Calendar className="w-5 h-5 text-blue-400" aria-hidden="true" />
-                    How long do you plan to invest?
+                    How long do you plan to study?
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                    Select your course duration. Your milestones and curriculum pacing will adapt to fit this timeline.
+                    Pick a duration from 1 to 24 months, or let AI estimate a realistic completion time.
                   </p>
                 </div>
 
-                {/* Duration Highlight Callout */}
                 <div className="p-5 rounded-xl bg-[#0e141f] border border-[#1e293b] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
@@ -465,13 +363,12 @@ export default function WizardPage() {
                     </p>
                   </div>
 
-                  {/* Quick Preset Buttons */}
                   <div className="flex flex-wrap sm:flex-nowrap gap-2">
                     {DURATION_PRESETS.map((m) => (
                       <button
                         key={m}
                         type="button"
-                        onClick={() => setDurationMonths(m)}
+                        onClick={() => handleSelectDuration(m)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium border transition-colors ${
                           durationMonths === m
                             ? 'bg-blue-600 text-white border-blue-500 shadow-xs'
@@ -484,14 +381,13 @@ export default function WizardPage() {
                   </div>
                 </div>
 
-                {/* Interactive Slider */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-xs">
                     <label htmlFor="duration-slider" className="font-semibold text-slate-300">
                       Duration Slider (1 to 24 Months)
                     </label>
                     <span className="font-mono text-blue-400 font-bold tnum">
-                      {durationMonths} Months
+                      {durationMonths} {durationMonths === 1 ? 'Month' : 'Months'}
                     </span>
                   </div>
                   <input
@@ -505,32 +401,33 @@ export default function WizardPage() {
                     aria-valuemin={1}
                     aria-valuemax={24}
                     aria-valuenow={durationMonths}
-                    onChange={(e) => setDurationMonths(Number(e.target.value))}
+                    onChange={(e) => handleSelectDuration(Number(e.target.value))}
                     className="w-full accent-blue-600 h-2 bg-[#0e141f] rounded-lg cursor-pointer"
                   />
                   <div className="flex justify-between text-[11px] text-slate-500 font-mono tnum">
-                    <span>1 mo (Sprint)</span>
+                    <span>1 mo</span>
                     <span>6 mo</span>
-                    <span>12 mo (1 Year)</span>
+                    <span>12 mo</span>
                     <span>18 mo</span>
-                    <span>24 mo (2 Years)</span>
+                    <span>24 mo</span>
                   </div>
                 </div>
 
                 {/* AI Duration Estimator */}
                 {aiDurationSuggestion ? (
                   <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-500/30 space-y-2.5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-semibold text-blue-300 flex items-center gap-1.5 font-mono">
-                        <Sparkles className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
-                        AI Timeline Calibration
+                        <Brain className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
+                        AI Recommendation: {aiDurationSuggestion.recommended_months}{' '}
+                        {aiDurationSuggestion.recommended_months === 1 ? 'Month' : 'Months'}
                       </span>
                       <button
                         type="button"
                         onClick={applyAiRecommendation}
-                        className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[11px] transition-colors"
+                        className="px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors"
                       >
-                        Apply {aiDurationSuggestion.recommended_months} Months
+                        Apply
                       </button>
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed">
@@ -538,23 +435,37 @@ export default function WizardPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] text-xs">
-                    <span className="text-slate-400 flex items-center gap-1.5 font-mono">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
-                      Unsure? Let Gemini recommend a duration for your goal
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleEstimateDuration}
-                      disabled={isEstimatingDuration}
-                      className="text-xs text-blue-400 hover:text-white font-medium"
-                    >
-                      {isEstimatingDuration ? 'Analyzing…' : 'Estimate Duration'}
-                    </button>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#0e141f] border border-[#1e293b] text-xs">
+                      <span className="text-slate-300 flex items-center gap-2 font-mono">
+                        <Brain className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
+                        Unsure how long this takes?
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleEstimateDuration}
+                        disabled={isEstimatingDuration}
+                        className="px-3 py-1.5 rounded-lg bg-blue-600/15 border border-blue-500/30 text-blue-400 hover:bg-blue-600/25 font-semibold transition-colors disabled:opacity-50"
+                      >
+                        {isEstimatingDuration ? 'Estimating…' : 'AI Estimate'}
+                      </button>
+                    </div>
+
+                    {estimateError && (
+                      <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs">
+                        <span className="text-rose-300">{estimateError}</span>
+                        <button
+                          type="button"
+                          onClick={handleEstimateDuration}
+                          className="shrink-0 px-2.5 py-1 rounded bg-rose-600 text-white font-semibold hover:bg-rose-500"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Step 1 Navigation */}
                 <div className="flex justify-between items-center pt-4 border-t border-[#1e293b]">
                   <button
                     type="button"
@@ -576,9 +487,7 @@ export default function WizardPage() {
               </motion.div>
             )}
 
-            {/* ============================================================ */}
-            {/* STEP 2: Milestone Frequency & Automated Milestone Count     */}
-            {/* ============================================================ */}
+            {/* STEP 2: Milestone Frequency + Overload Protection + Real-time Count */}
             {step === 2 && (
               <motion.div
                 key="step-2"
@@ -591,38 +500,65 @@ export default function WizardPage() {
                 <div>
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <Clock className="w-5 h-5 text-blue-400" aria-hidden="true" />
-                    Milestone Frequency &amp; Schedule
+                    Study Frequency &amp; Pacing
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                    Choose how often you want to hit milestones. Your total milestone count is automatically calculated based on your duration and frequency.
+                    Choose your study frequency. Milestones are calculated automatically from your duration and pace.
                   </p>
                 </div>
 
-                {/* Pacing Frequency Options */}
+                {(overloadAutoSwitched || isOverloadRestricted) && (
+                  <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+                    <p className="text-xs text-amber-300 leading-relaxed">
+                      {overloadAutoSwitched
+                        ? 'Overload Protection: Daily and Every 3 days pacing are disabled for 12+ month blueprints — automatically switched to Weekly.'
+                        : 'Overload Protection Active: For durations of 12 months or longer, Every day and Every 3 days pacing are disabled to keep your plan sustainable.'}
+                    </p>
+                  </div>
+                )}
+
                 <div className="space-y-3">
-                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono">
-                    Select Milestone Frequency
+                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono block">
+                    Select Study Frequency
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {PACING_OPTIONS.map((opt) => {
+                      const isDisabled =
+                        isOverloadRestricted && (opt.value === 'daily' || opt.value === 'every_3_days');
                       const isSelected = pacing === opt.value;
                       return (
                         <button
                           key={opt.value}
                           type="button"
-                          onClick={() => setPacing(opt.value)}
+                          disabled={isDisabled}
+                          onClick={() => handleSelectPacing(opt.value)}
                           className={`p-3.5 rounded-xl border text-left transition-colors flex items-start justify-between gap-3 ${
                             isSelected
                               ? 'bg-blue-600/15 border-blue-500 text-white ring-1 ring-blue-500/40 shadow-xs'
-                              : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                              : isDisabled
+                              ? 'opacity-40 cursor-not-allowed bg-[#0e141f] border-[#242f42] text-slate-500'
+                              : 'bg-[#0e141f] border-[#242f42] text-slate-300 hover:border-slate-500 hover:text-white'
                           }`}
                         >
-                          <div>
-                            <p className="font-semibold text-white text-sm">{opt.label}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">{opt.description}</p>
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <span className="text-base shrink-0 mt-0.5" aria-hidden="true">
+                              {opt.icon}
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-semibold text-white text-sm">{opt.label}</p>
+                                {isDisabled && (
+                                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">
+                                    12+ mo limit
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-400 mt-0.5">{opt.description}</p>
+                            </div>
                           </div>
                           <div
-                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
+                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-1 ${
                               isSelected
                                 ? 'bg-blue-600 border-blue-500 text-white'
                                 : 'border-slate-600 bg-[#121824]'
@@ -636,17 +572,17 @@ export default function WizardPage() {
                   </div>
                 </div>
 
-                {/* Automated Milestone Count Card (Automated, No Manual Configuration) */}
+                {/* Live Milestone Calculation Card */}
                 <div className="p-5 rounded-2xl bg-[#0e141f] border border-blue-500/30 space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2">
                       <Layers className="w-4 h-4 text-blue-400" aria-hidden="true" />
                       <span className="text-xs font-semibold text-blue-300 font-mono uppercase tracking-wider">
-                        Automated Milestone Count
+                        Calculated Milestone Count
                       </span>
                     </div>
                     <span className="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-mono font-bold border border-blue-500/30">
-                      Calculated Automatically
+                      Real-Time Formula
                     </span>
                   </div>
 
@@ -654,24 +590,21 @@ export default function WizardPage() {
                     <span className="text-3xl sm:text-4xl font-extrabold text-white font-mono tnum">
                       {automatedMilestones}
                     </span>
-                    <span className="text-base text-slate-300 font-semibold">
-                      Milestones
-                    </span>
+                    <span className="text-base text-slate-300 font-semibold">Milestones</span>
                   </div>
 
                   <div className="pt-2 border-t border-[#1e293b] text-xs text-slate-300 leading-relaxed font-mono">
                     <p>
-                      Calculation: <strong className="text-white tnum">{durationMonths} months</strong> &times;{' '}
-                      <strong className="text-white capitalize">{pacing}</strong> frequency ={' '}
-                      <strong className="text-blue-400 tnum">{automatedMilestones} structured milestones</strong>.
+                      <strong className="text-white tnum">{durationMonths} months</strong> &times;{' '}
+                      <strong className="text-white">{getPacingLabel(pacing)}</strong> ={' '}
+                      <strong className="text-blue-400 tnum">{automatedMilestones} checkpoints</strong>
                     </p>
                     <p className="text-slate-400 text-[11px] mt-1 font-sans">
-                      Each milestone will contain focused goals, verifyable deliverables, and curated learning resources.
+                      Every milestone includes learning objectives, real courses &amp; docs, practical exercises, projects, and completion checklists.
                     </p>
                   </div>
                 </div>
 
-                {/* Step 2 Navigation */}
                 <div className="flex justify-between items-center pt-4 border-t border-[#1e293b]">
                   <button
                     type="button"
@@ -683,7 +616,10 @@ export default function WizardPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setStep(3)}
+                    onClick={() => {
+                      setErrorMessage('');
+                      setStep(3);
+                    }}
                     className="btn-primary text-xs py-2.5 px-5"
                   >
                     Continue to Review
@@ -693,9 +629,7 @@ export default function WizardPage() {
               </motion.div>
             )}
 
-            {/* ============================================================ */}
-            {/* STEP 3: Review & Generate                                    */}
-            {/* ============================================================ */}
+            {/* STEP 3: Review Your Course Blueprint (Simple clean naming + AI Model + Compile) */}
             {step === 3 && (
               <motion.div
                 key="step-3"
@@ -711,67 +645,170 @@ export default function WizardPage() {
                     Review Your Course Blueprint
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                    Review your configuration below. Gemini will synthesize a complete curriculum with structured deliverables and verified resources.
+                    Name your blueprint cleanly below (or let AI assign a concise title), verify your timeline, and generate your roadmap.
                   </p>
                 </div>
 
-                {/* Blueprint Specification Receipt */}
+                {/* Blueprint Title Input (Simple, nice naming right in Review phase) */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-[#0e141f] border border-[#1e293b] space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label
+                      htmlFor="blueprint-title-input"
+                      className="text-xs font-semibold text-slate-200 flex items-center gap-1.5"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
+                      Blueprint Title
+                    </label>
+                    {hasCustomTitle ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHasCustomTitle(false);
+                          setCourseTitle(deriveNiceBlueprintTitle(goal));
+                        }}
+                        className="text-[11px] font-mono text-blue-400 hover:text-blue-300"
+                      >
+                        Reset to auto title
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-mono text-slate-400">
+                        Auto-named · Editable
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    id="blueprint-title-input"
+                    type="text"
+                    value={courseTitle}
+                    onChange={(e) => {
+                      setHasCustomTitle(true);
+                      setCourseTitle(e.target.value);
+                    }}
+                    placeholder={deriveNiceBlueprintTitle(goal)}
+                    className="input-field text-sm font-semibold py-2.5"
+                  />
+                </div>
+
+                {/* Specification Summary */}
                 <div className="p-5 rounded-2xl bg-[#0e141f] border border-[#1e293b] space-y-4 font-mono text-xs">
                   <div>
-                    <span className="text-[10px] uppercase tracking-wider text-slate-500 block">
-                      Course Title
-                    </span>
-                    <p className="text-base font-bold text-white font-sans mt-0.5">
-                      {courseTitle.trim() ||
-                        (selectedTitles.length > 0 ? selectedTitles.join(' & ') : goal)}
-                    </p>
-                  </div>
-
-                  <div className="pt-3 border-t border-[#1e293b]">
-                    <span className="text-[10px] uppercase tracking-wider text-slate-500 block">
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400 block">
                       Learning Goal
                     </span>
-                    <p className="text-xs text-slate-300 font-sans mt-0.5 leading-relaxed">
+                    <p className="text-xs text-slate-200 font-sans mt-1 leading-relaxed">
                       {goal}
                     </p>
                   </div>
 
                   <div className="grid grid-cols-3 gap-3 pt-3 border-t border-[#1e293b] tnum">
                     <div className="p-3 rounded-xl bg-[#121824] border border-[#242f42]">
-                      <span className="text-slate-500 text-[10px] uppercase block">Duration</span>
-                      <p className="text-white font-bold text-sm mt-0.5">{durationMonths} Months</p>
+                      <span className="text-slate-400 text-[10px] uppercase block">Duration</span>
+                      <p className="text-white font-bold text-sm mt-0.5">
+                        {durationMonths} {durationMonths === 1 ? 'Month' : 'Months'}
+                      </p>
                     </div>
 
                     <div className="p-3 rounded-xl bg-[#121824] border border-[#242f42]">
-                      <span className="text-slate-500 text-[10px] uppercase block">Frequency</span>
-                      <p className="text-white font-bold text-sm capitalize mt-0.5">{pacing}</p>
+                      <span className="text-slate-400 text-[10px] uppercase block">Frequency</span>
+                      <p className="text-white font-bold text-sm mt-0.5">{getPacingLabel(pacing)}</p>
                     </div>
 
                     <div className="p-3 rounded-xl bg-[#121824] border border-[#242f42]">
-                      <span className="text-slate-500 text-[10px] uppercase block">Milestones</span>
-                      <p className="text-blue-400 font-bold text-sm mt-0.5">{automatedMilestones} Milestones</p>
+                      <span className="text-slate-400 text-[10px] uppercase block">Milestones</span>
+                      <p className="text-blue-400 font-bold text-sm mt-0.5">
+                        {automatedMilestones} Milestones
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Loading State or Action Toolbar */}
+                {/* Gemini Model Switcher */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-[#0e141f] border border-[#1e293b] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
+                      Gemini AI Model
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400">
+                      Automatic failover active
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {BLUEPRINT_MODELS.map((m) => {
+                      const active = selectedModel === m.value;
+                      return (
+                        <button
+                          key={m.value}
+                          type="button"
+                          onClick={() => setSelectedModel(m.value)}
+                          className={`p-2.5 rounded-xl border text-left transition-colors ${
+                            active
+                              ? 'bg-blue-600/15 border-blue-500 text-white'
+                              : 'bg-[#121824] border-[#242f42] text-slate-300 hover:border-slate-500'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold">{m.label}</span>
+                            <span className="text-[10px] font-mono text-blue-400">{m.value}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Error + Retry + Model Switch */}
+                {errorMessage && (
+                  <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-3" role="alert">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" aria-hidden="true" />
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-rose-300">Blueprint Generation Error</p>
+                        <p className="text-xs text-slate-300 mt-1 leading-relaxed">{errorMessage}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleGenerate()}
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 text-white hover:bg-rose-500"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+                        Retry
+                      </button>
+                    </div>
+                    <div className="pt-2 border-t border-rose-500/20 flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-mono text-slate-400">
+                        Switch model &amp; retry:
+                      </span>
+                      {BLUEPRINT_MODELS.filter((m) => m.value !== selectedModel).map((m) => (
+                        <button
+                          key={m.value}
+                          type="button"
+                          onClick={() => handleGenerate(m.value)}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-[#121824] border border-[#242f42] text-slate-200 hover:border-blue-500/50 hover:text-blue-300"
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {isGenerating ? (
                   <div className="p-8 rounded-2xl bg-[#0e141f] border border-blue-500/30 text-center space-y-3">
                     <Spinner size="lg" />
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-white">
-                        {generationStepText}
-                      </p>
-                      <p className="text-xs text-slate-400 font-mono">
-                        Synthesizing verified documentation and deliverables…
-                      </p>
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-semibold text-white">{generationStepText}</p>
+                      <p className="text-xs text-blue-300 font-mono">{LOADING_TIPS[tipIndex]}</p>
                     </div>
                   </div>
                 ) : (
                   <div className="flex justify-between items-center pt-4 border-t border-[#1e293b]">
                     <button
                       type="button"
-                      onClick={() => setStep(2)}
+                      onClick={() => {
+                        setErrorMessage('');
+                        setStep(2);
+                      }}
                       className="btn-secondary text-xs py-2 px-4 inline-flex items-center gap-1.5"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
@@ -779,7 +816,7 @@ export default function WizardPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={handleGenerate}
+                      onClick={() => handleGenerate()}
                       className="btn-primary text-xs py-2.5 px-6 font-semibold inline-flex items-center gap-2"
                     >
                       <Sparkles className="w-4 h-4 text-blue-200" aria-hidden="true" />

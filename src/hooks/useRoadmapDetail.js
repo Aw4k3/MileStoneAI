@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { MOCK_ROADMAPS, MOCK_MILESTONES } from '../lib/mockData';
+import { generateUUID } from '../lib/gemini';
 
 function getRoadmapsStorageKey(userId) {
   return userId ? `milestone_ai_${userId}_roadmaps` : 'milestone_ai_guest_roadmaps';
@@ -19,7 +20,6 @@ function getStoredRoadmap(userId, id) {
     const found = list.find((r) => r.id === id);
     if (found) return found;
 
-    // Fallback check in guest storage
     if (userId) {
       const guestRaw = localStorage.getItem('milestone_ai_guest_roadmaps');
       const guestList = guestRaw ? JSON.parse(guestRaw) : [];
@@ -37,7 +37,6 @@ function getStoredMilestones(userId, id) {
     const map = raw ? JSON.parse(raw) : {};
     if (map[id]) return map[id];
 
-    // Fallback check in guest storage
     if (userId) {
       const guestRaw = localStorage.getItem('milestone_ai_guest_milestones');
       const guestMap = guestRaw ? JSON.parse(guestRaw) : {};
@@ -61,6 +60,24 @@ function updateStoredMilestones(userId, roadmapId, milestonesList) {
   }
 }
 
+function sortAndNormalizeMilestones(list) {
+  return [...(list || [])]
+    .sort((a, b) => {
+      const offsetDiff = (Number(a.estimated_week_offset) || 0) - (Number(b.estimated_week_offset) || 0);
+      if (offsetDiff !== 0) return offsetDiff;
+      return (a.order_index || 0) - (b.order_index || 0);
+    })
+    .map((m, idx) => ({
+      ...m,
+      estimated_week_offset: Number(m.estimated_week_offset) || idx + 1,
+      learning_objectives: Array.isArray(m.learning_objectives) ? m.learning_objectives : [],
+      practical_exercises: Array.isArray(m.practical_exercises) ? m.practical_exercises : [],
+      projects: Array.isArray(m.projects) ? m.projects : [],
+      deliverables: [...(m.deliverables || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)),
+      resources: [...(m.resources || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)),
+    }));
+}
+
 export function useRoadmapDetail(roadmapId) {
   const { user } = useAuth();
   const [roadmap, setRoadmap] = useState(null);
@@ -81,7 +98,7 @@ export function useRoadmapDetail(roadmapId) {
 
     if (localRm) {
       setRoadmap(localRm);
-      setMilestones(localMs || []);
+      setMilestones(sortAndNormalizeMilestones(localMs || []));
       setLoading(false);
       return;
     }
@@ -90,12 +107,12 @@ export function useRoadmapDetail(roadmapId) {
     const mockRm = MOCK_ROADMAPS.find((r) => r.id === roadmapId);
     if (mockRm) {
       setRoadmap(mockRm);
-      setMilestones(MOCK_MILESTONES[mockRm.id] || []);
+      setMilestones(sortAndNormalizeMilestones(MOCK_MILESTONES[mockRm.id] || []));
       setLoading(false);
       return;
     }
 
-    // 3. If Supabase is configured and ID looks like a UUID, query cloud DB
+    // 3. Query Supabase DB if ID is a valid UUID
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(roadmapId);
     if (isSupabaseConfigured && isUuid) {
       try {
@@ -115,16 +132,16 @@ export function useRoadmapDetail(roadmapId) {
 
         if (msError) throw msError;
 
+        const normalizedMs = sortAndNormalizeMilestones(msData || []);
         setRoadmap(rmData);
-        setMilestones(msData || []);
+        setMilestones(normalizedMs);
         setLoading(false);
         return;
       } catch (err) {
-        console.warn('Supabase fetch error, falling back:', err.message);
+        console.warn('Supabase fetch notice:', err.message);
       }
     }
 
-    // Not found anywhere
     setRoadmap(null);
     setMilestones([]);
     setLoading(false);
@@ -134,7 +151,6 @@ export function useRoadmapDetail(roadmapId) {
     fetchDetail();
   }, [fetchDetail]);
 
-  // Toggle Deliverable status
   const toggleDeliverable = async (milestoneId, deliverableId, currentStatus) => {
     const nextStatus = !currentStatus;
     const userId = user?.id || null;
@@ -165,14 +181,19 @@ export function useRoadmapDetail(roadmapId) {
     }
   };
 
-  // Toggle Milestone status
   const toggleMilestone = async (milestoneId, currentStatus) => {
     const nextStatus = !currentStatus;
     const userId = user?.id || null;
 
     setMilestones((prev) => {
       const updated = prev.map((m) =>
-        m.id === milestoneId ? { ...m, is_completed: nextStatus } : m
+        m.id === milestoneId
+          ? {
+              ...m,
+              is_completed: nextStatus,
+              completed_at: nextStatus ? new Date().toISOString() : null,
+            }
+          : m
       );
       updateStoredMilestones(userId, roadmapId, updated);
       return updated;
@@ -182,7 +203,10 @@ export function useRoadmapDetail(roadmapId) {
       try {
         await supabase
           .from('milestones')
-          .update({ is_completed: nextStatus })
+          .update({
+            is_completed: nextStatus,
+            completed_at: nextStatus ? new Date().toISOString() : null,
+          })
           .eq('id', milestoneId);
       } catch (err) {
         console.error('Failed to toggle milestone in Supabase:', err);
@@ -190,33 +214,40 @@ export function useRoadmapDetail(roadmapId) {
     }
   };
 
-  // Add Dynamic Milestone (Adaptive Reschedule)
   const addMilestone = async (newMilestoneData) => {
     const userId = user?.id || null;
-    const msId = crypto.randomUUID ? crypto.randomUUID() : `ms-${Date.now()}`;
+    const msId = generateUUID();
+    const nextOffset = milestones.length + 1;
     const newMs = {
       id: msId,
+      external_id: `${roadmapId}_m${nextOffset}`,
       roadmap_id: roadmapId,
       order_index: milestones.length,
+      estimated_week_offset: nextOffset,
       title: newMilestoneData.title,
       description: newMilestoneData.description || '',
+      learning_objectives: newMilestoneData.learning_objectives || [],
+      practical_exercises: newMilestoneData.practical_exercises || [],
+      projects: newMilestoneData.projects || [],
       is_completed: false,
       is_major: false,
       due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       xp_reward: 120,
       deliverables: (newMilestoneData.deliverables || []).map((d, i) => ({
-        id: crypto.randomUUID ? crypto.randomUUID() : `del-${msId}-${i}`,
+        id: generateUUID(),
         milestone_id: msId,
         title: typeof d === 'string' ? d : d.title,
         is_completed: false,
         order_index: i,
       })),
       resources: (newMilestoneData.resources || []).map((r, i) => ({
-        id: crypto.randomUUID ? crypto.randomUUID() : `res-${msId}-${i}`,
+        id: generateUUID(),
         milestone_id: msId,
         title: r.title,
-        url: r.url || 'https://google.com',
+        description: r.description || '',
+        url: r.url || '',
         type: r.type || 'docs',
+        is_free: typeof r.is_free === 'boolean' ? r.is_free : true,
         order_index: i,
       })),
     };
@@ -231,10 +262,15 @@ export function useRoadmapDetail(roadmapId) {
       try {
         await supabase.from('milestones').insert({
           id: newMs.id,
+          external_id: newMs.external_id,
           roadmap_id: newMs.roadmap_id,
           order_index: newMs.order_index,
+          estimated_week_offset: newMs.estimated_week_offset,
           title: newMs.title,
           description: newMs.description,
+          learning_objectives: newMs.learning_objectives,
+          practical_exercises: newMs.practical_exercises,
+          projects: newMs.projects,
           is_completed: false,
           is_major: false,
           xp_reward: newMs.xp_reward,

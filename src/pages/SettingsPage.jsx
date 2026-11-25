@@ -300,7 +300,7 @@ export default function SettingsPage() {
           {settings?.push_enabled && (
             <div className="pt-2 border-t border-[#1e293b] space-y-2">
               <label className="text-xs font-mono uppercase text-slate-400">Notification Pacing Cadence</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {PACING_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}

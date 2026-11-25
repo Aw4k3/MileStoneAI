@@ -1,48 +1,120 @@
 // src/lib/constants.js
 
-export const APP_NAME = 'Milestone AI'
+export const APP_NAME = 'Milestone AI';
 
-export const DIFFICULTY_LEVELS = ['beginner', 'intermediate', 'advanced']
+export const DIFFICULTY_LEVELS = ['beginner', 'intermediate', 'advanced'];
 
 export const PACING_OPTIONS = [
-  { value: 'weekly', label: 'Weekly', description: '1 milestone per week' },
-  { value: 'biweekly', label: 'Bi-weekly', description: '1 milestone every 2 weeks' },
-  { value: 'monthly', label: 'Monthly', description: '1 milestone per month' },
-  { value: 'quarterly', label: 'Quarterly', description: '1 milestone every 3 months' },
-]
+  { value: 'daily', label: 'Every day', description: '30 milestones per month', icon: '🔥' },
+  { value: 'every_3_days', label: 'Every 3 days', description: '10 milestones per month', icon: '⚡' },
+  { value: 'weekly', label: 'Weekly', description: '4 milestones per month', icon: '📅' },
+  { value: 'biweekly', label: 'Every 2 weeks', description: '2 milestones per month', icon: '🗓️' },
+  { value: 'monthly', label: 'Monthly', description: '1 milestone per month', icon: '🌙' },
+];
+
+export const DEFAULT_BLUEPRINT_MODEL = 'gemini-2.5-flash';
+
+export const BLUEPRINT_MODELS = [
+  {
+    value: 'gemini-2.5-flash',
+    label: 'Gemini 2.5 Flash',
+    description: 'Default — fast & accurate curriculum synthesis',
+  },
+  {
+    value: 'gemini-3-flash-preview',
+    label: 'Gemini 3 Flash Preview',
+    description: 'Next-gen Flash tier for rich curation',
+  },
+  {
+    value: 'gemini-2.0-flash',
+    label: 'Gemini 2.0 Flash',
+    description: 'Alternate stable Flash model',
+  },
+  {
+    value: 'gemini-2.5-pro',
+    label: 'Gemini 2.5 Pro',
+    description: 'Deep reasoning for dense subjects',
+  },
+];
+
+export function normalizePacingKey(pacing) {
+  const raw = String(pacing || 'weekly').toLowerCase();
+  if (raw === 'every3days') return 'every_3_days';
+  if (raw === 'daily' || raw === 'every_3_days' || raw === 'weekly' || raw === 'biweekly' || raw === 'monthly') {
+    return raw;
+  }
+  return 'weekly';
+}
+
+export function getPacingLabel(pacing) {
+  const key = normalizePacingKey(pacing);
+  return PACING_OPTIONS.find((p) => p.value === key)?.label || pacing;
+}
 
 /**
- * Automate milestone count based on duration and pacing frequency:
- * - 24 months + Monthly = 24 milestones
- * - 24 months + Quarterly = 8 milestones
- * - 12 months + Monthly = 12 milestones
- * - 6 months + Monthly = 6 milestones
+ * Automated milestone count with overload protection:
+ * - Every day: Months * 30
+ * - Every 3 days: Months * 10
+ * - Weekly: Months * 4
+ * - Every 2 weeks: Months * 2
+ * - Monthly: Months * 1
+ * For durations >= 12 months, Daily and Every 3 Days fall back to Weekly.
  */
 export function calculateMilestones(durationMonths, pacing) {
   const months = Math.max(1, Math.round(Number(durationMonths) || 1));
-  switch (pacing) {
+  let effectivePacing = normalizePacingKey(pacing);
+
+  if (months >= 12 && (effectivePacing === 'daily' || effectivePacing === 'every_3_days')) {
+    effectivePacing = 'weekly';
+  }
+
+  switch (effectivePacing) {
+    case 'daily':
+      return months * 30;
+    case 'every_3_days':
+      return months * 10;
     case 'weekly':
-      return Math.min(36, Math.max(1, months * 4));
+      return months * 4;
     case 'biweekly':
-      return Math.min(36, Math.max(1, months * 2));
-    case 'quarterly':
-      return Math.max(1, Math.round(months / 3));
+      return months * 2;
     case 'monthly':
+      return months * 1;
     default:
-      return Math.max(1, months);
+      return months * 4;
+  }
+}
+
+/**
+ * Dynamic Day / Week / Month label for a 1-based milestone offset.
+ */
+export function getMilestoneLabel(offset, pacing) {
+  const n = Math.max(1, Number(offset) || 1);
+  switch (normalizePacingKey(pacing)) {
+    case 'daily':
+      return `Day ${n}`;
+    case 'every_3_days':
+      return `Day ${(n - 1) * 3 + 1}`;
+    case 'weekly':
+      return `Week ${n}`;
+    case 'biweekly':
+      return `Week ${(n - 1) * 2 + 1}`;
+    case 'monthly':
+      return `Month ${n}`;
+    default:
+      return `Week ${n}`;
   }
 }
 
 export const GEMINI_MODELS = [
   { value: 'flash', label: 'Gemini Flash', description: 'Fast — chat, quizzes' },
-  { value: 'pro', label: 'Gemini Pro', description: 'Deep — roadmap generation' },
-]
+  { value: 'pro', label: 'Gemini Pro', description: 'Deep — blueprint generation' },
+];
 
 export const MENTOR_PERSONAS = [
   { value: 'tutor', label: 'Socratic Tutor', emoji: '🎓' },
   { value: 'coach', label: 'Strict Coach', emoji: '💪' },
   { value: 'peer', label: 'Encouraging Peer', emoji: '🤝' },
-]
+];
 
 export const RESOURCE_TYPES = [
   { value: 'course', label: 'Course', icon: '📚' },
@@ -50,51 +122,13 @@ export const RESOURCE_TYPES = [
   { value: 'video', label: 'Video', icon: '🎥' },
   { value: 'docs', label: 'Docs', icon: '📄' },
   { value: 'project', label: 'Project', icon: '🛠️' },
-]
-
-export const ROADMAP_TEMPLATES = [
-  {
-    title: 'Jetpack Compose',
-    goal: 'Master Jetpack Compose for building modern Android UIs',
-    difficulty: 'intermediate',
-    duration: 3,
-    icon: '📱',
-  },
-  {
-    title: '10K Running',
-    goal: 'Train from couch to running a 10K race comfortably',
-    difficulty: 'beginner',
-    duration: 3,
-    icon: '🏃',
-  },
-  {
-    title: 'Conversational French',
-    goal: 'Reach conversational fluency in French for travel and daily life',
-    difficulty: 'beginner',
-    duration: 6,
-    icon: '🇫🇷',
-  },
-  {
-    title: 'Indie Startup MVP',
-    goal: 'Build and launch an MVP for an indie SaaS product',
-    difficulty: 'intermediate',
-    duration: 4,
-    icon: '🚀',
-  },
-  {
-    title: 'Machine Learning',
-    goal: 'Learn machine learning from fundamentals to deploying models',
-    difficulty: 'advanced',
-    duration: 6,
-    icon: '🤖',
-  },
-]
+];
 
 export const BADGE_DEFINITIONS = [
-  { slug: 'first_roadmap', name: 'Trailblazer', description: 'Created your first roadmap', emoji: '🗺️' },
-  { slug: 'first_complete', name: 'Finisher', description: 'Completed your first roadmap', emoji: '🏁' },
+  { slug: 'first_roadmap', name: 'Trailblazer', description: 'Created your first blueprint', emoji: '🗺️' },
+  { slug: 'first_complete', name: 'Finisher', description: 'Completed your first blueprint', emoji: '🏁' },
   { slug: 'streak_7', name: 'Week Warrior', description: '7-day activity streak', emoji: '🔥' },
   { slug: 'streak_30', name: 'Monthly Master', description: '30-day activity streak', emoji: '⚡' },
   { slug: 'xp_1000', name: 'XP Hunter', description: 'Earned 1,000 XP', emoji: '💎' },
   { slug: 'quiz_ace', name: 'Quiz Ace', description: 'Passed 10 milestone quizzes', emoji: '🧠' },
-]
+];

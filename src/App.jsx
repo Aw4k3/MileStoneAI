@@ -1,6 +1,6 @@
 // src/App.jsx
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import PrivateRoute from './components/common/PrivateRoute';
@@ -12,8 +12,11 @@ import RoadmapPage from './pages/RoadmapPage';
 import ChatPage from './pages/ChatPage';
 import SettingsPage from './pages/SettingsPage';
 import DocsPage from './pages/DocsPage';
-import PathwayCompilerPage from './pages/PathwayCompilerPage';
-import PathwayRoadmapPage from './pages/PathwayRoadmapPage';
+
+function LegacyPathwayDetailRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/roadmap/${id}`} replace />;
+}
 
 export default function App() {
   return (
@@ -33,22 +36,8 @@ export default function App() {
                 </PrivateRoute>
               }
             />
-            <Route
-              path="/pathway/new"
-              element={
-                <PrivateRoute>
-                  <PathwayCompilerPage />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/pathway/:id"
-              element={
-                <PrivateRoute>
-                  <PathwayRoadmapPage />
-                </PrivateRoute>
-              }
-            />
+            <Route path="/pathway/new" element={<Navigate to="/wizard" replace />} />
+            <Route path="/pathway/:id" element={<LegacyPathwayDetailRedirect />} />
             <Route
               path="/roadmap/:id"
               element={

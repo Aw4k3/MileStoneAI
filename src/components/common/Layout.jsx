@@ -10,7 +10,6 @@ import {
   Presentation,
   Sun,
   Moon,
-  Zap,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -28,7 +27,6 @@ export default function Layout({ children }) {
 
   const navLinks = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'AI Pathway', path: user ? '/pathway/new' : '/auth', icon: Zap },
     { label: 'New Blueprint', path: user ? '/wizard' : '/auth', icon: PlusCircle },
     { label: 'Docs & Deck', path: '/docs', icon: Presentation },
     { label: 'Settings', path: '/settings', icon: Settings },
@@ -72,7 +70,7 @@ export default function Layout({ children }) {
               const Icon = link.icon;
               const isActive =
                 location.pathname === link.path ||
-                (link.path === '/pathway/new' && location.pathname.startsWith('/pathway'));
+                (link.path === '/dashboard' && location.pathname.startsWith('/roadmap'));
               return (
                 <Link
                   key={link.label}
@@ -84,7 +82,10 @@ export default function Layout({ children }) {
                       : 'text-slate-400 hover:text-slate-200 hover:bg-[#121824]'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-blue-400' : 'text-slate-400'}`} aria-hidden="true" />
+                  <Icon
+                    className={`w-3.5 h-3.5 ${isActive ? 'text-blue-400' : 'text-slate-400'}`}
+                    aria-hidden="true"
+                  />
                   {link.label}
                 </Link>
               );
@@ -145,19 +146,22 @@ export default function Layout({ children }) {
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0b0f17]/95 backdrop-blur-md border-t border-[#1e293b] px-2 py-2" aria-label="Mobile Navigation">
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0b0f17]/95 backdrop-blur-md border-t border-[#1e293b] px-4 py-2"
+        aria-label="Mobile Navigation"
+      >
         <div className="flex items-center justify-around max-w-md mx-auto">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const isActive =
               location.pathname === link.path ||
-              (link.path === '/pathway/new' && location.pathname.startsWith('/pathway'));
+              (link.path === '/dashboard' && location.pathname.startsWith('/roadmap'));
             return (
               <Link
                 key={link.label}
                 to={link.path}
                 aria-current={isActive ? 'page' : undefined}
-                className={`flex flex-col items-center gap-1 py-1 px-1.5 whitespace-nowrap transition-colors ${
+                className={`flex flex-col items-center gap-1 py-1 px-3 transition-colors ${
                   isActive ? 'text-blue-400 font-semibold' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >

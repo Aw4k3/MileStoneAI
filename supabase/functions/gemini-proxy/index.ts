@@ -262,7 +262,7 @@ CRITICAL REQUIREMENTS:
 Return ONLY valid JSON matching:
 {
   "overview": {
-    "ai_title": "Maximum 4 words",
+    "ai_title": "Simple, nice, clear title (maximum 4 words, plain everyday wording)",
     "goal_summary": "string",
     "estimated_duration_weeks": ${defaultEstimatedWeeks},
     "difficulty_level": "Beginner|Intermediate|Advanced",
