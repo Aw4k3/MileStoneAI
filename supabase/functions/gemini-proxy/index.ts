@@ -1,6 +1,6 @@
 // supabase/functions/gemini-proxy/index.ts
 // Secure Gemini AI Proxy Edge Function for Milestone AI
-// Powered by Supabase secrets GEMINI_API_KEY and Gemini 3 Flash / 3.1 Pro
+// Powered by Supabase secrets GEMINI_API_KEY and Google Gemini 2.5 Flash (with multi-model failover)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -18,6 +18,8 @@ interface RequestBody {
     | "chat"
     | "micro_quiz"
     | "estimate_duration"
+    | "estimate_pathway_duration"
+    | "compile_pathway"
     | "rebalance"
     | "suggest_titles";
   payload: any;
@@ -32,7 +34,7 @@ serve(async (req: Request) => {
   try {
     const { action, payload }: RequestBody = await req.json();
 
-    // Use Gemini 3 Flash Preview as primary workhorse, 3.1 Pro for deep architecture
+    // Legacy action tiering (preserved for existing flows)
     const modelTier =
       payload?.model === "pro" || payload?.gemini_model === "pro"
         ? "gemini-3.1-pro-preview"
@@ -59,6 +61,12 @@ serve(async (req: Request) => {
       case "estimate_duration":
         return await handleEstimateDuration(payload, modelTier);
 
+      case "estimate_pathway_duration":
+        return await handleEstimatePathwayDuration(payload);
+
+      case "compile_pathway":
+        return await handleCompilePathway(payload);
+
       case "rebalance":
         return await handleRebalance(payload, modelTier);
 
@@ -76,6 +84,232 @@ serve(async (req: Request) => {
     );
   }
 });
+
+// ==============================================================================
+// SHARED MULTI-MODEL CALLER FOR AI PATHWAY COMPILER
+// Default model: gemini-2.5-flash with automatic failover on API/quota/model errors
+// ==============================================================================
+function buildPathwayModelChain(preferredModel?: string): string[] {
+  const candidates = [
+    preferredModel,
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-3-flash-preview",
+  ];
+  return candidates.filter((m, idx, arr): m is string => Boolean(m) && arr.indexOf(m) === idx);
+}
+
+async function callGeminiJsonWithFallback(opts: {
+  prompt: string;
+  systemInstruction?: string;
+  temperature: number;
+  maxOutputTokens?: number;
+  preferredModel?: string;
+  timeoutMs?: number;
+}): Promise<{ jsonText: string; modelUsed: string }> {
+  const models = buildPathwayModelChain(opts.preferredModel);
+  let lastError: Error | null = null;
+  const timeoutMs = opts.timeoutMs ?? 90000;
+
+  for (const model of models) {
+    const cleanModel = model.replace(/^models\//, "");
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${GEMINI_API_KEY}`;
+
+    const body: any = {
+      contents: [{ parts: [{ text: opts.prompt }] }],
+      generationConfig: {
+        temperature: opts.temperature,
+        responseMimeType: "application/json",
+        maxOutputTokens: opts.maxOutputTokens ?? 8192,
+      },
+    };
+
+    if (opts.systemInstruction) {
+      body.system_instruction = {
+        parts: [{ text: opts.systemInstruction }],
+      };
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Model ${cleanModel} failed (${res.status}): ${errorText}`);
+      }
+
+      const data = await res.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      if (!rawText.trim()) {
+        throw new Error(`Model ${cleanModel} returned empty response`);
+      }
+
+      const jsonText = extractJson(rawText);
+      // Verify it parses cleanly before accepting this model's output
+      JSON.parse(jsonText);
+
+      return { jsonText, modelUsed: cleanModel };
+    } catch (err: any) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn(`[gemini-proxy] ${cleanModel} attempt failed:`, lastError.message);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  throw lastError || new Error("All Gemini models failed to produce a valid JSON response.");
+}
+
+// ==============================================================================
+// PATHWAY COMPILER ACTION A: ESTIMATE PATHWAY DURATION (temp 0.2)
+// ==============================================================================
+async function handleEstimatePathwayDuration(payload: any) {
+  const goal = String(payload?.goal || "").trim();
+  if (!goal) {
+    return new Response(
+      JSON.stringify({ error: "Missing learning goal for duration estimation." }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const prompt = `You are an expert learning strategist. Analyze this learning goal and estimate a realistic time in months for someone to achieve meaningful proficiency with consistent study sessions.
+
+Learning Goal: "${goal}"
+
+Consider:
+- Complexity and breadth of the subject
+- Typical learner background
+- Sustainable study pacing without burnout
+
+Choose the closest realistic duration among 1, 3, 6, 12, or 24 months (or an integer between 1 and 24).
+
+Return ONLY valid JSON with this exact structure:
+{"recommended_months": 3, "reasoning": "Brief explanation of why this duration is realistic and what factors you considered."}`;
+
+  const { jsonText, modelUsed } = await callGeminiJsonWithFallback({
+    prompt,
+    systemInstruction: "You are an expert learning strategist. Return valid JSON only matching {\"recommended_months\": number, \"reasoning\": string}.",
+    temperature: 0.2,
+    maxOutputTokens: 1024,
+    preferredModel: payload?.model || "gemini-2.5-flash",
+    timeoutMs: 60000,
+  });
+
+  const parsed = JSON.parse(jsonText);
+  return new Response(
+    JSON.stringify({
+      recommended_months: Number(parsed.recommended_months) || 3,
+      reasoning: parsed.reasoning || "",
+      model_used: modelUsed,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// ==============================================================================
+// PATHWAY COMPILER ACTION B: COMPILE PERSONALIZED LEARNING PATHWAY (temp 0.3)
+// ==============================================================================
+async function handleCompilePathway(payload: any) {
+  const goal = String(payload?.goal || "").trim();
+  const durationMonths = Number(payload?.durationMonths) || 3;
+  const pacing = String(payload?.pacing || "weekly");
+  const milestoneCount = Number(payload?.milestoneCount) || 12;
+  const preferredModel = payload?.model || "gemini-2.5-flash";
+
+  if (!goal) {
+    return new Response(
+      JSON.stringify({ error: "Missing learning goal for pathway compilation." }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Use caller-provided prompt if supplied (supports chunked generation for very large milestone counts)
+  const defaultEstimatedWeeks = Math.round(durationMonths * 4.33);
+  const systemInstruction =
+    payload?.systemInstruction ||
+    "You are a world-class learning strategist and curriculum designer. Output valid JSON only. Never fabricate learning resource names or URLs.";
+
+  const prompt =
+    payload?.prompt ||
+    `You are a world-class learning strategist and curriculum architect. Create a comprehensive, realistic learning pathway for this goal.
+
+Learning Goal: "${goal}"
+Duration: ${durationMonths} months
+Study Frequency: ${pacing}
+Required Milestones: EXACTLY ${milestoneCount} milestones
+
+CRITICAL REQUIREMENTS:
+1. Generate EXACTLY ${milestoneCount} milestones — no more, no less.
+2. Assign sequential estimated_week_offset values from 1 to ${milestoneCount}.
+3. For every milestone, provide:
+   - Learn: Clear learning_objectives explaining topics, concepts, and skills to master.
+   - Watch & Read: Real courses, video tutorials, books, and official docs with direct URLs (e.g. Coursera, edX, YouTube, official docs, freeCodeCamp, Khan Academy, MIT OCW, MDN, roadmap.sh).
+   - Practice: Hands-on practical_exercises and guided activities.
+   - Build: Concrete projects that reinforce the milestone's skills.
+   - Deliverables: Clear, measurable deliverables proving understanding.
+4. NEVER fabricate course names, websites, or URLs. Prefer reputable, free resources whenever possible and set "is_free": true or false accurately.
+5. Sequence topics logically from fundamentals to advanced mastery, avoiding unnecessary repetition across milestones.
+
+Return ONLY valid JSON matching:
+{
+  "overview": {
+    "ai_title": "Maximum 4 words",
+    "goal_summary": "string",
+    "estimated_duration_weeks": ${defaultEstimatedWeeks},
+    "difficulty_level": "Beginner|Intermediate|Advanced",
+    "expected_outcomes": ["string"]
+  },
+  "milestones": [
+    {
+      "id": "m1",
+      "title": "string",
+      "description": "string",
+      "learning_objectives": ["string"],
+      "resources": [
+        {
+          "type": "Course|Book|Video|Docs|Project",
+          "title": "string",
+          "description": "string",
+          "url": "https://...",
+          "is_free": true
+        }
+      ],
+      "practical_exercises": ["string"],
+      "projects": ["string"],
+      "deliverables": ["string"],
+      "estimated_week_offset": 1,
+      "status": "Not Started"
+    }
+  ]
+}`;
+
+  const { jsonText, modelUsed } = await callGeminiJsonWithFallback({
+    prompt,
+    systemInstruction,
+    temperature: 0.3,
+    maxOutputTokens: 65536,
+    preferredModel,
+    timeoutMs: 95000,
+  });
+
+  const parsed = JSON.parse(jsonText);
+  return new Response(
+    JSON.stringify({
+      ...parsed,
+      model_used: modelUsed,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
 
 // ==============================================================================
 // 1. ACTION: SUGGEST FORMAL COURSE TITLES
@@ -360,12 +594,16 @@ async function callGeminiAPI(model: string, prompt: string, expectJson: boolean 
 
 // Extract JSON safely from string
 function extractJson(text: string): string {
-  const trimmed = text.trim();
+  let trimmed = text.trim();
   if (trimmed.startsWith("```json")) {
-    return trimmed.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+    trimmed = trimmed.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+  } else if (trimmed.startsWith("```")) {
+    trimmed = trimmed.replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
   }
-  if (trimmed.startsWith("```")) {
-    return trimmed.replace(/^```\s*/, "").replace(/\s*```$/, "");
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    return trimmed.substring(firstBrace, lastBrace + 1);
   }
   return trimmed;
 }
@@ -392,7 +630,7 @@ function handleMissingApiKeyFallback(action: string, payload: any) {
     );
   }
 
-  if (action === "estimate_duration") {
+  if (action === "estimate_duration" || action === "estimate_pathway_duration") {
     return new Response(
       JSON.stringify({
         recommended_months: 3,

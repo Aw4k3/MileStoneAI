@@ -12,6 +12,8 @@ import RoadmapPage from './pages/RoadmapPage';
 import ChatPage from './pages/ChatPage';
 import SettingsPage from './pages/SettingsPage';
 import DocsPage from './pages/DocsPage';
+import PathwayCompilerPage from './pages/PathwayCompilerPage';
+import PathwayRoadmapPage from './pages/PathwayRoadmapPage';
 
 export default function App() {
   return (
@@ -28,6 +30,22 @@ export default function App() {
               element={
                 <PrivateRoute>
                   <WizardPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/pathway/new"
+              element={
+                <PrivateRoute>
+                  <PathwayCompilerPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/pathway/:id"
+              element={
+                <PrivateRoute>
+                  <PathwayRoadmapPage />
                 </PrivateRoute>
               }
             />

@@ -11,6 +11,7 @@ import {
   Clock,
   Compass,
   Trash2,
+  Zap,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import ProgressRing from '../components/common/ProgressRing';
@@ -18,6 +19,7 @@ import Spinner from '../components/common/Spinner';
 import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useRoadmaps } from '../hooks/useRoadmaps';
+import { usePathways } from '../hooks/usePathways';
 import { useStats } from '../hooks/useStats';
 
 const STARTER_SUGGESTIONS = [
@@ -26,13 +28,21 @@ const STARTER_SUGGESTIONS = [
   'Distributed Systems in Go',
 ];
 
+const PATHWAY_DIFFICULTY_STYLES = {
+  Beginner: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  Intermediate: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  Advanced: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+};
+
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { roadmaps, milestonesMap, loading: roadmapsLoading, deleteRoadmap } = useRoadmaps();
+  const { pathways, loading: pathwaysLoading, removePathway } = usePathways();
   const { stats, loading: statsLoading } = useStats();
 
   const [blueprintToDelete, setBlueprintToDelete] = useState(null);
+  const [pathwayToDelete, setPathwayToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
@@ -68,6 +78,12 @@ export default function DashboardPage() {
     completedMilestonesCount += list.filter((m) => m.is_completed).length;
   });
 
+  pathways.forEach((pw) => {
+    const list = pw.milestones || [];
+    totalMilestonesCount += list.length;
+    completedMilestonesCount += list.filter((m) => m.status === 'Completed').length;
+  });
+
   const globalCompletion = totalMilestonesCount > 0
     ? Math.round((completedMilestonesCount / totalMilestonesCount) * 100)
     : 0;
@@ -89,7 +105,13 @@ export default function DashboardPage() {
     }
   };
 
-  if (authLoading || roadmapsLoading || statsLoading) {
+  const handleConfirmDeletePathway = () => {
+    if (!pathwayToDelete) return;
+    removePathway(pathwayToDelete.id);
+    setPathwayToDelete(null);
+  };
+
+  if (authLoading || roadmapsLoading || pathwaysLoading || statsLoading) {
     return (
       <Layout>
         <div className="py-24 flex flex-col items-center justify-center space-y-3">
@@ -117,21 +139,30 @@ export default function DashboardPage() {
                 : 'Your curriculum milestones and active mentor context are synced and ready.'}
             </p>
           </div>
-          <Link
-            to="/wizard"
-            className="btn-primary self-start sm:self-auto text-xs py-2 px-4 inline-flex items-center gap-2 shadow-sm"
-          >
-            <PlusCircle className="w-3.5 h-3.5" aria-hidden="true" />
-            New Blueprint
-          </Link>
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <Link
+              to="/pathway/new"
+              className="btn-secondary self-start sm:self-auto text-xs py-2 px-4 inline-flex items-center gap-2 shadow-sm border-blue-500/40 text-blue-400 hover:text-blue-300"
+            >
+              <Zap className="w-3.5 h-3.5" aria-hidden="true" />
+              AI Pathway
+            </Link>
+            <Link
+              to="/wizard"
+              className="btn-primary self-start sm:self-auto text-xs py-2 px-4 inline-flex items-center gap-2 shadow-sm"
+            >
+              <PlusCircle className="w-3.5 h-3.5" aria-hidden="true" />
+              New Blueprint
+            </Link>
+          </div>
         </div>
 
         {/* Command Metrics Bar with Tabular Figures */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-[#121824] border border-[#242f42] rounded-2xl p-4 sm:p-5">
           <div className="space-y-1 pr-4 border-r border-[#1e293b]/80">
-            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Active Blueprints</span>
+            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Active Plans</span>
             <p className="text-2xl font-bold font-mono tnum text-white">
-              {roadmaps.filter((r) => r.status === 'active').length}
+              {roadmaps.filter((r) => r.status === 'active').length + pathways.length}
             </p>
           </div>
 
@@ -207,6 +238,99 @@ export default function DashboardPage() {
               >
                 <Trash2 className="w-4 h-4" aria-hidden="true" />
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* AI Compiled Pathways Section */}
+        {pathways.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Zap className="w-4 h-4 text-blue-400" aria-hidden="true" />
+                AI Learning Pathways
+              </h2>
+              <span className="text-xs font-mono text-slate-400 tnum">
+                {pathways.length} compiled
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pathways.map((pw) => {
+                const pwMilestones = pw.milestones || [];
+                const pwDone = pwMilestones.filter((m) => m.status === 'Completed').length;
+                const pwPercent =
+                  pwMilestones.length > 0 ? Math.round((pwDone / pwMilestones.length) * 100) : 0;
+                const pwOverview = pw.overview || {};
+                const pwTitle = (pwOverview.ai_title || '').trim() || pw.title || pw.goal;
+                const pwDiff = pwOverview.difficulty_level || 'Intermediate';
+
+                return (
+                  <Link
+                    key={pw.id}
+                    to={`/pathway/${pw.id}`}
+                    className="p-5 rounded-2xl bg-[#121824] border border-[#242f42] hover:border-[#3b4c68] transition-colors flex flex-col justify-between group"
+                  >
+                    <div className="space-y-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`px-2 py-0.5 text-[10px] font-mono font-semibold uppercase rounded border ${
+                                PATHWAY_DIFFICULTY_STYLES[pwDiff] || PATHWAY_DIFFICULTY_STYLES.Intermediate
+                              }`}
+                            >
+                              {pwDiff}
+                            </span>
+                            <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" aria-hidden="true" />
+                              {pw.durationMonths} mo · {pw.pacing}
+                            </span>
+                          </div>
+                          <h3 className="text-base font-bold text-white group-hover:text-blue-400 transition-colors line-clamp-1">
+                            {pwTitle}
+                          </h3>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setPathwayToDelete(pw);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-colors"
+                            aria-label={`Delete ${pwTitle}`}
+                            title="Delete pathway"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                          </button>
+                          <ProgressRing progress={pwPercent} size={40} strokeWidth={4} />
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+                        {pwOverview.goal_summary || pw.goal}
+                      </p>
+                    </div>
+
+                    <div className="pt-4 mt-4 border-t border-[#1e293b] flex items-center justify-between text-xs text-slate-400">
+                      <span className="flex items-center gap-1.5 font-mono text-[11px] tnum">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            pwPercent === 100 && pwMilestones.length > 0 ? 'bg-emerald-400' : 'bg-blue-400'
+                          }`}
+                        />
+                        {pwDone} of {pwMilestones.length} milestones complete
+                      </span>
+                      <span className="text-blue-400 flex items-center gap-0.5 font-medium group-hover:translate-x-0.5 transition-transform">
+                        Open Pathway <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}
@@ -374,7 +498,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Delete Confirmation Dialog */}
+        {/* Delete Confirmation Dialogs */}
         <DeleteConfirmModal
           isOpen={!!blueprintToDelete}
           onClose={() => setBlueprintToDelete(null)}
@@ -382,6 +506,13 @@ export default function DashboardPage() {
           itemTitle={blueprintToDelete?.title || ''}
           itemType="Blueprint"
           isDeleting={isDeleting}
+        />
+        <DeleteConfirmModal
+          isOpen={!!pathwayToDelete}
+          onClose={() => setPathwayToDelete(null)}
+          onConfirm={handleConfirmDeletePathway}
+          itemTitle={pathwayToDelete?.overview?.ai_title || pathwayToDelete?.title || pathwayToDelete?.goal || ''}
+          itemType="Pathway"
         />
       </div>
     </Layout>
