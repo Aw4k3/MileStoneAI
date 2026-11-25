@@ -75,7 +75,7 @@ function migrateLegacyPathways(userId) {
         pacing,
         key_outcomes: overview.expected_outcomes || [],
         gemini_model: String(pw.modelUsed || '').includes('pro') ? 'pro' : 'flash',
-        ai_model: pw.modelUsed || 'gemini-2.5-flash',
+        ai_model: pw.modelUsed || 'gemini-3.5-flash',
         status: 'active',
         start_date: (pw.createdAt || new Date().toISOString()).slice(0, 10),
         created_at: pw.createdAt || new Date().toISOString(),
@@ -244,7 +244,7 @@ export function useRoadmaps() {
     pacing = 'weekly',
     key_outcomes = [],
     gemini_model = 'flash',
-    ai_model = 'gemini-2.5-flash',
+    ai_model = 'gemini-3.5-flash',
     milestones = [],
   }) => {
     const userId = user?.id || null;
@@ -273,7 +273,7 @@ export function useRoadmaps() {
       pacing: resolvedPacing,
       key_outcomes: key_outcomes || [],
       gemini_model: resolvedDbModel,
-      ai_model: ai_model || 'gemini-2.5-flash',
+      ai_model: ai_model || 'gemini-3.5-flash',
       status: 'active',
       start_date: new Date().toISOString().slice(0, 10),
       target_end_date: new Date(Date.now() + (Number(duration_months) || 3) * 30 * 24 * 60 * 60 * 1000)

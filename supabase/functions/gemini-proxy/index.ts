@@ -91,18 +91,26 @@ serve(async (req: Request) => {
 
 // ==============================================================================
 // SHARED MULTI-MODEL CALLER FOR BLUEPRINT ENGINE
-// Failover order: gemini-3.5-flash -> gemini-2.5-pro -> gemini-2.5-flash -> gemini-2.0-flash
+// Active failover chain (excludes retired 2.0/2.5 404 endpoints)
 // ==============================================================================
+const RETIRED_MODELS = new Set([
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.0-flash",
+  "gemini-2.0-flash-lite",
+]);
+
 function buildPathwayModelChain(preferredModel?: string, singleModel?: boolean): string[] {
-  if (singleModel && preferredModel) {
-    return [preferredModel];
+  const cleanPreferred = preferredModel ? String(preferredModel).replace(/^models\//, "") : undefined;
+  const safePreferred = cleanPreferred && !RETIRED_MODELS.has(cleanPreferred) ? cleanPreferred : undefined;
+
+  if (singleModel && safePreferred) {
+    return [safePreferred];
   }
   const candidates = [
-    preferredModel,
+    safePreferred,
     "gemini-3.5-flash",
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
     "gemini-3.5-flash-lite",
     "gemini-flash-lite-latest",
     "gemini-3.8-flash",
@@ -110,9 +118,70 @@ function buildPathwayModelChain(preferredModel?: string, singleModel?: boolean):
     "gemini-3.1-pro-preview",
     "gemini-3-flash-preview",
   ];
-  const unique = candidates.filter((m, idx, arr): m is string => Boolean(m) && arr.indexOf(m) === idx);
-  // Append one trailing pass on the fast lite model in case of a brief 503 high-demand spike
-  return singleModel ? unique : [...unique, "gemini-3.5-flash-lite"];
+  return candidates.filter((m, idx, arr): m is string => Boolean(m) && arr.indexOf(m) === idx);
+}
+
+async function runModelAttempt(opts: {
+  model: string;
+  prompt: string;
+  systemInstruction?: string;
+  temperature: number;
+  maxOutputTokens?: number;
+  timeoutMs: number;
+}): Promise<{ jsonText: string; modelUsed: string }> {
+  const cleanModel = opts.model.replace(/^models\//, "");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${GEMINI_API_KEY}`;
+
+  const body: any = {
+    contents: [{ parts: [{ text: opts.prompt }] }],
+    generationConfig: {
+      temperature: opts.temperature,
+      responseMimeType: "application/json",
+      maxOutputTokens: opts.maxOutputTokens ?? 8192,
+    },
+  };
+
+  if (opts.systemInstruction) {
+    body.system_instruction = {
+      parts: [{ text: opts.systemInstruction }],
+    };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      let brief = errorText;
+      try {
+        const parsedErr = JSON.parse(errorText);
+        brief = parsedErr?.error?.message || errorText;
+      } catch {}
+      throw new Error(`HTTP ${res.status}: ${brief.slice(0, 180)}`);
+    }
+
+    const data = await res.json();
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (!rawText.trim()) {
+      const finishReason = data?.candidates?.[0]?.finishReason || "EMPTY";
+      throw new Error(`Empty output (${finishReason})`);
+    }
+
+    const jsonText = extractJson(rawText);
+    JSON.parse(jsonText);
+
+    return { jsonText, modelUsed: cleanModel };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function callGeminiJsonWithFallback(opts: {
@@ -129,62 +198,43 @@ async function callGeminiJsonWithFallback(opts: {
   const timeoutMs = opts.timeoutMs ?? 90000;
 
   for (const model of models) {
-    const cleanModel = model.replace(/^models\//, "");
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${GEMINI_API_KEY}`;
-
-    const body: any = {
-      contents: [{ parts: [{ text: opts.prompt }] }],
-      generationConfig: {
-        temperature: opts.temperature,
-        responseMimeType: "application/json",
-        maxOutputTokens: opts.maxOutputTokens ?? 8192,
-      },
-    };
-
-    if (opts.systemInstruction) {
-      body.system_instruction = {
-        parts: [{ text: opts.systemInstruction }],
-      };
-    }
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
     try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
+      const res = await runModelAttempt({
+        model,
+        prompt: opts.prompt,
+        systemInstruction: opts.systemInstruction,
+        temperature: opts.temperature,
+        maxOutputTokens: opts.maxOutputTokens,
+        timeoutMs,
       });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        let brief = errorText;
-        try {
-          const parsedErr = JSON.parse(errorText);
-          brief = parsedErr?.error?.message || errorText;
-        } catch {}
-        throw new Error(`HTTP ${res.status}: ${brief.slice(0, 180)}`);
-      }
-
-      const data = await res.json();
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      if (!rawText.trim()) {
-        const finishReason = data?.candidates?.[0]?.finishReason || "EMPTY";
-        throw new Error(`Empty output (${finishReason})`);
-      }
-
-      const jsonText = extractJson(rawText);
-      JSON.parse(jsonText);
-
-      return { jsonText, modelUsed: cleanModel, attemptErrors };
+      return { ...res, attemptErrors };
     } catch (err: any) {
       const msg = err instanceof Error ? err.message : String(err);
-      attemptErrors.push(`${cleanModel} -> ${msg}`);
-      console.warn(`[gemini-proxy] ${cleanModel} attempt failed:`, msg);
-    } finally {
-      clearTimeout(timer);
+      attemptErrors.push(`${model} -> ${msg}`);
+      console.warn(`[gemini-proxy] ${model} attempt failed:`, msg);
+    }
+  }
+
+  // Automatic retry pass after backoff for transient 503/429 high-demand spikes
+  if (!opts.singleModel) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const retryModels = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.8-flash"];
+    for (const model of retryModels) {
+      try {
+        const res = await runModelAttempt({
+          model,
+          prompt: opts.prompt,
+          systemInstruction: opts.systemInstruction,
+          temperature: opts.temperature,
+          maxOutputTokens: opts.maxOutputTokens,
+          timeoutMs,
+        });
+        return { ...res, attemptErrors };
+      } catch (err: any) {
+        const msg = err instanceof Error ? err.message : String(err);
+        attemptErrors.push(`${model} (retry) -> ${msg}`);
+        console.warn(`[gemini-proxy] ${model} retry failed:`, msg);
+      }
     }
   }
 
@@ -215,7 +265,7 @@ Return ONLY valid JSON matching: {"title": "Short Clean Title"}`;
     temperature: 0.2,
     maxOutputTokens: 2048,
     preferredModel: payload?.model || "gemini-3.5-flash",
-    timeoutMs: Number(payload?.timeoutMs) || 8000,
+    timeoutMs: Number(payload?.timeoutMs) || 4500,
     singleModel: Boolean(payload?.singleModel),
   });
 
@@ -262,7 +312,7 @@ Return ONLY valid JSON with this exact structure:
     temperature: 0.2,
     maxOutputTokens: 2048,
     preferredModel: payload?.model || "gemini-3.5-flash",
-    timeoutMs: Number(payload?.timeoutMs) || 12000,
+    timeoutMs: Number(payload?.timeoutMs) || 10000,
     singleModel: Boolean(payload?.singleModel),
   });
 

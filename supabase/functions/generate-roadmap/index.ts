@@ -30,7 +30,15 @@ serve(async (req: Request) => {
       });
     }
 
-    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-3-flash-preview"];
+    const candidateModels = [
+      "gemini-3.5-flash",
+      "gemini-3.5-flash-lite",
+      "gemini-flash-lite-latest",
+      "gemini-3.8-flash",
+      "gemini-flash-latest",
+      "gemini-3.1-pro-preview",
+      "gemini-3-flash-preview",
+    ];
     let lastError = null;
     let resultJson = null;
 

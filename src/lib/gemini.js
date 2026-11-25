@@ -1,5 +1,5 @@
 // src/lib/gemini.js
-// Unified Blueprint AI Engine (Gemini 2.5 Flash default + multi-model failover)
+// Unified Blueprint AI Engine (automatic multi-model failover & auto-retry)
 // Calls Supabase Edge Functions securely so API keys never leak to client bundles.
 
 import { supabase, isSupabaseConfigured } from './supabase';
@@ -11,11 +11,16 @@ import {
 
 export { DEFAULT_BLUEPRINT_MODEL };
 
-const MODEL_FALLBACK_ORDER = [
-  'gemini-3.5-flash',
+const RETIRED_MODELS = new Set([
   'gemini-2.5-pro',
   'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
   'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+]);
+
+const MODEL_FALLBACK_ORDER = [
+  'gemini-3.5-flash',
   'gemini-3.5-flash-lite',
   'gemini-flash-lite-latest',
   'gemini-3.8-flash',
@@ -23,6 +28,25 @@ const MODEL_FALLBACK_ORDER = [
   'gemini-3.1-pro-preview',
   'gemini-3-flash-preview',
 ];
+
+function delayMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function sanitizeUserErrorMessage(rawMessage) {
+  const msg = String(rawMessage || '');
+  if (!msg) return 'Temporarily unable to reach the AI service. Please try again.';
+  if (/timeout|timed out|abort/i.test(msg)) {
+    return 'The request took a bit too long. Please try again.';
+  }
+  if (/429|quota|rate.?limit|503|high demand|All Gemini models failed|Gemini API Error/i.test(msg)) {
+    return 'The AI service is experiencing brief high demand. Please retry in a moment.';
+  }
+  if (/404|NOT_FOUND/i.test(msg)) {
+    return 'The AI service is refreshing its model routing. Please try again.';
+  }
+  return msg;
+}
 
 const RESOURCE_TYPES_CANONICAL = {
   course: 'course',
@@ -61,45 +85,57 @@ export function generateUUID() {
 }
 
 /**
- * Generates a short, clean blueprint title using Gemini.
+ * Generates a short, clean blueprint title automatically via AI (with auto-retry).
  */
 export async function generateBlueprintTitleWithAI({ goal }) {
   const cleanGoal = String(goal || '').trim();
   if (!cleanGoal) return '';
 
-  if (isSupabaseConfigured) {
-    try {
-      const data = await invokeSupabaseFunction(
-        'gemini-proxy',
-        { action: 'generate_title', payload: { goal: cleanGoal, model: DEFAULT_BLUEPRINT_MODEL } },
-        25000
-      );
-      if (data?.title && String(data.title).trim()) {
-        return String(data.title).trim();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (isSupabaseConfigured) {
+      try {
+        const data = await invokeSupabaseFunction(
+          'gemini-proxy',
+          { action: 'generate_title', payload: { goal: cleanGoal, model: DEFAULT_BLUEPRINT_MODEL } },
+          20000
+        );
+        if (data?.title && String(data.title).trim()) {
+          return String(data.title).trim();
+        }
+      } catch (err) {
+        console.warn(`generate_title proxy attempt ${attempt + 1} notice:`, err.message);
       }
-    } catch (err) {
-      console.warn('generate_title proxy notice:', err.message);
+    }
+
+    if (getGeminiApiKey()) {
+      try {
+        const prompt = `Create a simple, clean, natural course title (maximum 4 words, plain everyday wording, no colons) for this learning goal:
+"${cleanGoal}"
+Return ONLY valid JSON: {"title": "Short Clean Title"}`;
+        const { text } = await callDirectGeminiApi({
+          prompt,
+          systemInstruction: 'Return valid JSON only: {"title": string}.',
+          temperature: 0.2,
+          expectJson: true,
+          timeoutMs: 20000,
+          preferredModel: DEFAULT_BLUEPRINT_MODEL,
+          maxOutputTokens: 2048,
+        });
+        const parsed = safeParseJson(text);
+        if (parsed?.title && String(parsed.title).trim()) {
+          return String(parsed.title).trim();
+        }
+      } catch (err) {
+        console.warn(`generate_title direct attempt ${attempt + 1} notice:`, err.message);
+      }
+    }
+
+    if (attempt === 0) {
+      await delayMs(500);
     }
   }
 
-  if (getGeminiApiKey()) {
-    const prompt = `Create a simple, clean, natural course title (maximum 4 words, plain everyday wording, no colons) for this learning goal:
-"${cleanGoal}"
-Return ONLY valid JSON: {"title": "Short Clean Title"}`;
-    const { text } = await callDirectGeminiApi({
-      prompt,
-      systemInstruction: 'Return valid JSON only: {"title": string}.',
-      temperature: 0.2,
-      expectJson: true,
-      timeoutMs: 25000,
-      preferredModel: DEFAULT_BLUEPRINT_MODEL,
-      maxOutputTokens: 2048,
-    });
-    const parsed = safeParseJson(text);
-    if (parsed?.title) return String(parsed.title).trim();
-  }
-
-  throw new Error('Could not generate title from AI.');
+  throw new Error('Could not generate title automatically. Please try regenerating or enter one manually.');
 }
 
 /**
@@ -174,8 +210,10 @@ function safeParseJson(raw) {
 }
 
 function buildModelChain(preferredModel) {
-  const first = preferredModel || DEFAULT_BLUEPRINT_MODEL;
-  return [first, ...MODEL_FALLBACK_ORDER.filter((m) => m !== first)];
+  const cleanFirst = preferredModel ? String(preferredModel).replace(/^models\//, '') : '';
+  const safeFirst =
+    cleanFirst && !RETIRED_MODELS.has(cleanFirst) ? cleanFirst : DEFAULT_BLUEPRINT_MODEL;
+  return [safeFirst, ...MODEL_FALLBACK_ORDER.filter((m) => m !== safeFirst)];
 }
 
 async function invokeSupabaseFunction(slug, bodyPayload, timeoutMs = 95000) {
@@ -255,9 +293,15 @@ async function callDirectGeminiApi({
   }
 
   const models = buildModelChain(preferredModel);
+  const fastRetryModels = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.8-flash'];
+  const attemptOrder = [...models, ...fastRetryModels];
   let lastError = null;
 
-  for (const model of models) {
+  for (let i = 0; i < attemptOrder.length; i++) {
+    const model = attemptOrder[i];
+    if (i === models.length) {
+      await delayMs(600);
+    }
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const body = {
@@ -291,7 +335,7 @@ async function callDirectGeminiApi({
 
       if (!res.ok) {
         const errorText = await res.text();
-        const err = new Error(`Gemini API Error (${res.status} on ${model}): ${errorText}`);
+        const err = new Error(`Model ${model} HTTP ${res.status}: ${errorText.slice(0, 180)}`);
         err.status = res.status;
         throw err;
       }
@@ -299,20 +343,23 @@ async function callDirectGeminiApi({
       const json = await res.json();
       const text = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
       if (!text.trim()) {
-        throw new Error(`Gemini (${model}) returned an empty response.`);
+        throw new Error(`Model ${model} returned an empty response.`);
       }
 
       return { text, modelUsed: model };
     } catch (err) {
-      lastError = err.name === 'AbortError'
-        ? new Error(`Gemini (${model}) timed out after ${Math.round(timeoutMs / 1000)}s.`)
-        : err;
+      const normalizedErr =
+        err.name === 'AbortError'
+          ? new Error(`Model ${model} timed out after ${Math.round(timeoutMs / 1000)}s.`)
+          : err;
+      lastError = normalizedErr;
+      console.warn(`[blueprint] Direct model ${model} notice:`, normalizedErr.message);
     } finally {
       clearTimeout(timer);
     }
   }
 
-  throw lastError || new Error('The AI service is temporarily unavailable. Please try again.');
+  throw new Error(sanitizeUserErrorMessage(lastError?.message));
 }
 
 // ---------------------------------------------------------------------------
@@ -325,70 +372,85 @@ export async function estimateDurationWithAI({ goal, model = DEFAULT_BLUEPRINT_M
     throw new Error('Please enter a learning goal before estimating duration.');
   }
 
-  if (isSupabaseConfigured) {
-    try {
-      const data = await invokeSupabaseFunction(
-        'gemini-proxy',
-        { action: 'estimate_pathway_duration', payload: { goal: cleanGoal, model } },
-        65000
-      );
-      if (data && typeof data.recommended_months === 'number') {
-        return {
-          recommended_months: Math.min(24, Math.max(1, Math.round(data.recommended_months))),
-          reasoning: data.reasoning || 'Estimated based on scope and sustainable study pacing.',
-          model_used: data.model_used || model,
-        };
+  let lastErr = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (isSupabaseConfigured) {
+      try {
+        const data = await invokeSupabaseFunction(
+          'gemini-proxy',
+          { action: 'estimate_pathway_duration', payload: { goal: cleanGoal, model } },
+          45000
+        );
+        if (data && typeof data.recommended_months === 'number') {
+          return {
+            recommended_months: Math.min(24, Math.max(1, Math.round(data.recommended_months))),
+            reasoning: data.reasoning || 'Estimated based on scope and sustainable study pacing.',
+            model_used: data.model_used || model,
+          };
+        }
+      } catch (proxyErr) {
+        lastErr = proxyErr;
+        console.warn(`estimate_pathway_duration attempt ${attempt + 1} notice:`, proxyErr.message);
       }
-    } catch (proxyErr) {
-      console.warn('estimate_pathway_duration proxy notice:', proxyErr.message);
+
+      try {
+        const data = await invokeSupabaseFunction('estimate-duration', { goal: cleanGoal }, 45000);
+        if (data && typeof data.recommended_months === 'number') {
+          return {
+            recommended_months: Math.min(24, Math.max(1, Math.round(data.recommended_months))),
+            reasoning: data.reasoning || 'Estimated based on subject breadth and practical cadence.',
+            model_used: 'gemini-3.5-flash',
+          };
+        }
+      } catch (edgeErr) {
+        lastErr = edgeErr;
+        console.warn(`estimate-duration attempt ${attempt + 1} notice:`, edgeErr.message);
+      }
     }
 
-    try {
-      const data = await invokeSupabaseFunction('estimate-duration', { goal: cleanGoal }, 65000);
-      if (data && typeof data.recommended_months === 'number') {
-        return {
-          recommended_months: Math.min(24, Math.max(1, Math.round(data.recommended_months))),
-          reasoning: data.reasoning || 'Estimated based on subject breadth and practical cadence.',
-          model_used: 'gemini-3.5-flash',
-        };
-      }
-    } catch (edgeErr) {
-      console.warn('estimate-duration endpoint notice:', edgeErr.message);
-    }
-  }
-
-  const prompt = `You are an expert learning strategist. Analyze this learning goal and estimate a realistic duration in months for someone to achieve it with consistent study sessions.
+    if (getGeminiApiKey()) {
+      try {
+        const prompt = `You are an expert learning strategist. Analyze this learning goal and estimate a realistic duration in months for someone to achieve it with consistent study sessions.
 
 Learning Goal: "${cleanGoal}"
 
 Return ONLY valid JSON with this exact structure:
 {"recommended_months": 3, "reasoning": "Brief explanation of why this duration is realistic and what factors you considered."}`;
 
-  const { text, modelUsed } = await callDirectGeminiApi({
-    prompt,
-    systemInstruction:
-      'You are an expert learning strategist. Output valid JSON only matching {"recommended_months": number, "reasoning": string}.',
-    temperature: 0.2,
-    expectJson: true,
-    timeoutMs: 65000,
-    preferredModel: model,
-    maxOutputTokens: 1024,
-  });
+        const { text, modelUsed } = await callDirectGeminiApi({
+          prompt,
+          systemInstruction:
+            'You are an expert learning strategist. Output valid JSON only matching {"recommended_months": number, "reasoning": string}.',
+          temperature: 0.2,
+          expectJson: true,
+          timeoutMs: 45000,
+          preferredModel: model,
+          maxOutputTokens: 2048,
+        });
 
-  const parsed = safeParseJson(text);
-  if (!parsed || typeof parsed.recommended_months !== 'number') {
-    throw new Error('Could not parse duration estimate. Please try again.');
+        const parsed = safeParseJson(text);
+        if (parsed && typeof parsed.recommended_months === 'number') {
+          return {
+            recommended_months: Math.min(24, Math.max(1, Math.round(parsed.recommended_months))),
+            reasoning: parsed.reasoning || '',
+            model_used: modelUsed,
+          };
+        }
+      } catch (directErr) {
+        lastErr = directErr;
+      }
+    }
+
+    if (attempt === 0) {
+      await delayMs(600);
+    }
   }
 
-  return {
-    recommended_months: Math.min(24, Math.max(1, Math.round(parsed.recommended_months))),
-    reasoning: parsed.reasoning || '',
-    model_used: modelUsed,
-  };
+  throw new Error(sanitizeUserErrorMessage(lastErr?.message));
 }
 
 // ---------------------------------------------------------------------------
-// 2. Blueprint Compiler (Gemini 2.5 Flash default, temp 0.3, exact validation)
+// 2. Blueprint Compiler (automatic multi-model failover, temp 0.3, exact validation)
 // ---------------------------------------------------------------------------
 
 function buildCompilePrompt({
@@ -662,15 +724,10 @@ async function executeCompileChunk({
   }
 
   if (proxyError) {
-    if (proxyError.status === 429 || /quota|rate.?limit/i.test(proxyError.message)) {
-      throw new Error(
-        'The AI service is temporarily busy. Please wait a moment and retry.'
-      );
-    }
-    throw proxyError;
+    throw new Error(sanitizeUserErrorMessage(proxyError.message));
   }
 
-  throw new Error('Unable to reach AI compilation service. Please try again.');
+  throw new Error('Unable to reach the AI compilation service. Please try again.');
 }
 
 /**
@@ -717,11 +774,15 @@ export async function generateRoadmapWithAI({
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         if (onProgress && attempt > 0) {
-          onProgress(`Refining timeline to guarantee all ${expectedCount} milestones…`);
+          onProgress(
+            lastErr?.code === 'MILESTONE_COUNT_MISMATCH'
+              ? `Refining timeline to guarantee all ${expectedCount} milestones…`
+              : 'Retrying automatically with backup capacity…'
+          );
         }
 
         const effectivePrompt =
-          attempt === 0
+          attempt === 0 || !lastErr?.code
             ? prompt
             : `${prompt}\n\nIMPORTANT CORRECTION: Previous output contained ${lastErr?.actualCount || 'wrong count of'} milestones. You MUST output EXACTLY ${expectedCount} milestone objects numbered estimated_week_offset 1..${expectedCount}.`;
 
@@ -745,10 +806,11 @@ export async function generateRoadmapWithAI({
       } catch (err) {
         lastErr = err;
         console.warn(`[blueprint] Compilation attempt ${attempt + 1} notice:`, err.message);
-        // Only auto-retry on exact count / parse mismatch; don't double-call on hard API errors
-        if (err?.code !== 'MILESTONE_COUNT_MISMATCH' && !(err instanceof SyntaxError)) {
-          throw err;
+        if (attempt === 0) {
+          await delayMs(1800);
+          continue;
         }
+        throw new Error(sanitizeUserErrorMessage(err.message));
       }
     }
 

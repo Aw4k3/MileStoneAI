@@ -75,6 +75,7 @@ export default function WizardPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const tipTimerRef = useRef(null);
   const lastTitledGoalRef = useRef('');
+  const titleAttemptFailedRef = useRef('');
   const hasCustomTitleRef = useRef(false);
 
   useEffect(() => {
@@ -100,12 +101,15 @@ export default function WizardPage() {
     return () => clearInterval(tipTimerRef.current);
   }, [isGenerating]);
 
-  const fetchAiTitle = useCallback(async (targetGoal) => {
+  const fetchAiTitle = useCallback(async (targetGoal, { force = false } = {}) => {
     const clean = String(targetGoal || '').trim();
     if (!clean) return;
-    if (lastTitledGoalRef.current === clean) return;
+    if (!force && (lastTitledGoalRef.current === clean || titleAttemptFailedRef.current === clean)) {
+      return;
+    }
 
     lastTitledGoalRef.current = clean;
+    titleAttemptFailedRef.current = '';
     setIsGeneratingTitle(true);
     try {
       const aiTitle = await generateBlueprintTitleWithAI({ goal: clean });
@@ -115,15 +119,37 @@ export default function WizardPage() {
     } catch (err) {
       console.warn('Title generation notice:', err.message);
       lastTitledGoalRef.current = '';
+      titleAttemptFailedRef.current = clean;
     } finally {
       setIsGeneratingTitle(false);
     }
   }, []);
 
-  // Ensure title is fetched if landing directly on Review step without custom edit
+  // Pre-generate AI Blueprint Title automatically shortly after goal input settles
   useEffect(() => {
-    if (step === 3 && goal.trim() && !hasCustomTitle && !courseTitle.trim() && !isGeneratingTitle) {
-      fetchAiTitle(goal);
+    const clean = goal.trim();
+    if (clean.length < 8 || hasCustomTitle) return undefined;
+    if (lastTitledGoalRef.current === clean || titleAttemptFailedRef.current === clean) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      fetchAiTitle(clean);
+    }, 900);
+    return () => clearTimeout(timer);
+  }, [goal, hasCustomTitle, fetchAiTitle]);
+
+  // Trigger AI title once on Review step if not yet attempted (never loops infinitely on error)
+  useEffect(() => {
+    const clean = goal.trim();
+    if (
+      step === 3 &&
+      clean &&
+      !hasCustomTitle &&
+      !courseTitle.trim() &&
+      !isGeneratingTitle &&
+      titleAttemptFailedRef.current !== clean
+    ) {
+      fetchAiTitle(clean);
     }
   }, [step, goal, hasCustomTitle, courseTitle, isGeneratingTitle, fetchAiTitle]);
 
@@ -687,18 +713,19 @@ export default function WizardPage() {
                         <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
                         Naming blueprint…
                       </span>
-                    ) : hasCustomTitle ? (
+                    ) : hasCustomTitle || !courseTitle.trim() ? (
                       <button
                         type="button"
                         onClick={() => {
                           setHasCustomTitle(false);
                           lastTitledGoalRef.current = '';
+                          titleAttemptFailedRef.current = '';
                           setCourseTitle('');
-                          fetchAiTitle(goal);
+                          fetchAiTitle(goal, { force: true });
                         }}
                         className="text-[11px] font-mono text-blue-400 hover:text-blue-300"
                       >
-                        Regenerate AI title
+                        {courseTitle.trim() ? 'Regenerate AI title' : 'Auto-generate title'}
                       </button>
                     ) : (
                       <span className="text-[11px] font-mono text-slate-400">
