@@ -12,9 +12,9 @@ export const PATHWAY_MODELS = [
     description: 'Default — fast & accurate curriculum synthesis',
   },
   {
-    value: 'gemini-2.5-flash-lite',
-    label: 'Gemini 2.5 Flash Lite',
-    description: 'Ultra-fast lightweight fallback tier',
+    value: 'gemini-3-flash-preview',
+    label: 'Gemini 3 Flash Preview',
+    description: 'Next-gen Flash tier for rich curation',
   },
   {
     value: 'gemini-2.0-flash',
@@ -32,6 +32,7 @@ const MODEL_FALLBACK_ORDER = [
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
   'gemini-2.0-flash',
+  'gemini-3-flash-preview',
   'gemini-2.5-pro',
 ];
 
