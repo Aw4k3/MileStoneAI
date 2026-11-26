@@ -5,11 +5,11 @@ export const APP_NAME = 'Milestone AI';
 export const DIFFICULTY_LEVELS = ['beginner', 'intermediate', 'advanced'];
 
 export const PACING_OPTIONS = [
-  { value: 'daily', label: 'Every day', description: '30 milestones per month', icon: '🔥' },
-  { value: 'every_3_days', label: 'Every 3 days', description: '10 milestones per month', icon: '⚡' },
-  { value: 'weekly', label: 'Weekly', description: '4 milestones per month', icon: '📅' },
-  { value: 'biweekly', label: 'Every 2 weeks', description: '2 milestones per month', icon: '🗓️' },
-  { value: 'monthly', label: 'Monthly', description: '1 milestone per month', icon: '🌙' },
+  { value: 'daily', label: 'Every day', description: '30 milestones per month', rate: '30/mo' },
+  { value: 'every_3_days', label: 'Every 3 days', description: '10 milestones per month', rate: '10/mo' },
+  { value: 'weekly', label: 'Weekly', description: '4 milestones per month', rate: '4/mo' },
+  { value: 'biweekly', label: 'Every 2 weeks', description: '2 milestones per month', rate: '2/mo' },
+  { value: 'monthly', label: 'Monthly', description: '1 milestone per month', rate: '1/mo' },
 ];
 
 export const DEFAULT_BLUEPRINT_MODEL = 'gemini-3.5-flash';
@@ -83,24 +83,24 @@ export function getMilestoneLabel(offset, pacing) {
 }
 
 export const MENTOR_PERSONAS = [
-  { value: 'tutor', label: 'Socratic Tutor', emoji: '🎓' },
-  { value: 'coach', label: 'Strict Coach', emoji: '💪' },
-  { value: 'peer', label: 'Encouraging Peer', emoji: '🤝' },
+  { value: 'tutor', label: 'Socratic Tutor', hint: 'Discovery-guided' },
+  { value: 'coach', label: 'Strict Coach', hint: 'Deliverable-focused' },
+  { value: 'peer', label: 'Study Peer', hint: 'Collaborative' },
 ];
 
 export const RESOURCE_TYPES = [
-  { value: 'course', label: 'Course', icon: '📚' },
-  { value: 'book', label: 'Book', icon: '📖' },
-  { value: 'video', label: 'Video', icon: '🎥' },
-  { value: 'docs', label: 'Docs', icon: '📄' },
-  { value: 'project', label: 'Project', icon: '🛠️' },
+  { value: 'course', label: 'Course' },
+  { value: 'book', label: 'Book' },
+  { value: 'video', label: 'Video' },
+  { value: 'docs', label: 'Docs' },
+  { value: 'project', label: 'Project' },
 ];
 
 export const BADGE_DEFINITIONS = [
-  { slug: 'first_roadmap', name: 'Trailblazer', description: 'Created your first blueprint', emoji: '🗺️' },
-  { slug: 'first_complete', name: 'Finisher', description: 'Completed your first blueprint', emoji: '🏁' },
-  { slug: 'streak_7', name: 'Week Warrior', description: '7-day activity streak', emoji: '🔥' },
-  { slug: 'streak_30', name: 'Monthly Master', description: '30-day activity streak', emoji: '⚡' },
-  { slug: 'xp_1000', name: 'XP Hunter', description: 'Earned 1,000 XP', emoji: '💎' },
-  { slug: 'quiz_ace', name: 'Quiz Ace', description: 'Passed 10 milestone quizzes', emoji: '🧠' },
+  { slug: 'first_roadmap', name: 'Trailblazer', description: 'Created your first blueprint' },
+  { slug: 'first_complete', name: 'Finisher', description: 'Completed your first blueprint' },
+  { slug: 'streak_7', name: 'Week Warrior', description: '7-day activity streak' },
+  { slug: 'streak_30', name: 'Monthly Master', description: '30-day activity streak' },
+  { slug: 'xp_1000', name: 'XP Hunter', description: 'Earned 1,000 XP' },
+  { slug: 'quiz_ace', name: 'Quiz Ace', description: 'Passed 10 milestone quizzes' },
 ];

@@ -1,11 +1,11 @@
 // src/pages/AuthPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Rocket, RefreshCw, Sun, Moon } from 'lucide-react';
+import { Eye, EyeOff, RefreshCw, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import Spinner from '../components/common/Spinner';
+import BrandMark from '../components/common/BrandMark';
 
 export default function AuthPage() {
   const { theme, toggleTheme } = useTheme();
@@ -31,7 +31,7 @@ export default function AuthPage() {
     setFormError('');
 
     if (!email || !password) {
-      setFormError('Please enter both your email and password.');
+      setFormError('Please enter your email and password.');
       return;
     }
 
@@ -43,7 +43,7 @@ export default function AuthPage() {
       }
       navigate('/dashboard');
     } catch (err) {
-      setFormError(err.message || 'Authentication failed. Please verify credentials.');
+      setFormError(err.message || 'Authentication failed. Please verify your credentials.');
     }
   };
 
@@ -59,45 +59,38 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-[#0b0f17] text-slate-100 relative">
-      {/* Quick Theme Toggle */}
+    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-[#0b0d14] text-[#eef0f5] relative">
+      {/* Theme toggle */}
       <div className="absolute top-4 right-4">
         <button
           type="button"
           onClick={toggleTheme}
-          className="p-2 rounded-xl text-slate-400 hover:text-white bg-[#121824] border border-[#242f42] transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 shadow-sm"
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#7a8296] hover:text-[#eef0f5] bg-[#11141c] border border-white/[0.08] transition-colors focus-visible:ring-2 focus-visible:ring-blue-500"
           aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {theme === 'dark' ? (
-            <Sun className="w-4 h-4 text-amber-400" aria-hidden="true" />
+            <Sun className="w-4 h-4 text-amber-400" strokeWidth={1.5} aria-hidden="true" />
           ) : (
-            <Moon className="w-4 h-4 text-blue-500" aria-hidden="true" />
+            <Moon className="w-4 h-4 text-blue-500" strokeWidth={1.5} aria-hidden="true" />
           )}
         </button>
       </div>
 
-      {/* Brand Header */}
+      {/* Brand */}
       <Link
         to="/"
-        className="flex items-center gap-3 mb-8 group focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg p-1"
-        aria-label="Milestone AI Home"
+        className="mb-8 focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg p-1"
+        aria-label="Milestone AI home"
       >
-        <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold transition-transform group-hover:scale-105 shadow-sm">
-          <Rocket className="w-4 h-4" aria-hidden="true" />
-        </div>
-        <div className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-white">
-          <span>Milestone</span>
-          <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-            AI
-          </span>
-        </div>
+        <BrandMark />
       </Link>
 
-      {/* Auth Card */}
-      <div className="w-full max-w-sm bg-[#121824] border border-[#242f42] rounded-2xl p-6 sm:p-7 shadow-xl">
-        {/* Segmented Tab Switcher */}
-        <div className="grid grid-cols-2 p-1 rounded-lg bg-[#0d131d] border border-[#1e293b] mb-6 text-xs" role="tablist">
+      {/* Auth Panel (16px radius, 24px padding -> 8px nested control radius) */}
+      <div className="w-full max-w-sm bg-[#11141c] border border-white/[0.1] rounded-2xl p-6">
+        <div
+          className="grid grid-cols-2 p-1 rounded-lg bg-[#07080d] border border-white/[0.08] mb-6 text-xs"
+          role="tablist"
+        >
           <button
             type="button"
             role="tab"
@@ -106,11 +99,11 @@ export default function AuthPage() {
               setIsSignUp(false);
               setFormError('');
             }}
-            className={`py-1.5 font-medium rounded-md transition-colors ${
-              !isSignUp ? 'bg-[#1a2332] text-white shadow-xs font-semibold' : 'text-slate-400 hover:text-slate-200'
+            className={`h-8 font-medium rounded-md transition-colors ${
+              !isSignUp ? 'bg-[#1a1e28] text-[#eef0f5]' : 'text-[#7a8296] hover:text-[#eef0f5]'
             }`}
           >
-            Sign In
+            Sign in
           </button>
           <button
             type="button"
@@ -120,11 +113,11 @@ export default function AuthPage() {
               setIsSignUp(true);
               setFormError('');
             }}
-            className={`py-1.5 font-medium rounded-md transition-colors ${
-              isSignUp ? 'bg-[#1a2332] text-white shadow-xs font-semibold' : 'text-slate-400 hover:text-slate-200'
+            className={`h-8 font-medium rounded-md transition-colors ${
+              isSignUp ? 'bg-[#1a1e28] text-[#eef0f5]' : 'text-[#7a8296] hover:text-[#eef0f5]'
             }`}
           >
-            Create Account
+            Create account
           </button>
         </div>
 
@@ -134,12 +127,11 @@ export default function AuthPage() {
           </div>
         )}
 
-        {/* Google OAuth Quick Button */}
         <button
           type="button"
           onClick={handleGoogle}
           disabled={loading || isGoogleLoading}
-          className="w-full py-2.5 px-4 rounded-xl border border-[#242f42] bg-[#0d131d] hover:bg-[#161f2e] text-slate-200 text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors mb-4 disabled:opacity-50"
+          className="w-full h-10 px-4 rounded-lg border border-white/[0.1] bg-[#0b0d14] hover:bg-[#1a1e28] text-[#eef0f5] text-xs font-medium flex items-center justify-center gap-2.5 transition-colors mb-4 disabled:opacity-50"
         >
           {isGoogleLoading ? (
             <div className="flex items-center gap-2">
@@ -171,46 +163,37 @@ export default function AuthPage() {
           )}
         </button>
 
-        {/* Centered Or Email Divider */}
         <div className="relative flex items-center justify-center my-4">
           <div className="absolute inset-0 flex items-center" aria-hidden="true">
-            <div className="w-full border-t border-[#1e293b]" />
+            <div className="w-full border-t border-white/[0.08]" />
           </div>
-          <span className="relative bg-[#121824] px-3 text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+          <span className="relative bg-[#11141c] px-3 text-xs font-mono text-[#7a8296]">
             or email
           </span>
         </div>
 
-        {/* Email & Password Form */}
-        <form onSubmit={handleSubmit} className="space-y-3.5">
-          <AnimatePresence mode="wait">
-            {isSignUp && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.15 }}
-              >
-                <label htmlFor="fullName" className="block text-xs font-semibold text-slate-300 mb-1">
-                  Full Name
-                </label>
-                <input
-                  id="fullName"
-                  name="fullName"
-                  type="text"
-                  autoComplete="name"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Alex Chen"
-                  className="input-field text-xs py-2.5"
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {isSignUp && (
+            <div>
+              <label htmlFor="fullName" className="block text-xs font-medium text-[#a3a9b8] mb-1.5">
+                Full name
+              </label>
+              <input
+                id="fullName"
+                name="fullName"
+                type="text"
+                autoComplete="name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Alex Chen"
+                className="input-field text-xs h-10"
+              />
+            </div>
+          )}
 
           <div>
-            <label htmlFor="email" className="block text-xs font-semibold text-slate-300 mb-1">
-              Email Address
+            <label htmlFor="email" className="block text-xs font-medium text-[#a3a9b8] mb-1.5">
+              Email address
             </label>
             <input
               id="email"
@@ -222,16 +205,14 @@ export default function AuthPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="input-field text-xs py-2.5"
+              className="input-field text-xs h-10"
             />
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label htmlFor="password" className="text-xs font-semibold text-slate-300">
-                Password
-              </label>
-            </div>
+            <label htmlFor="password" className="block text-xs font-medium text-[#a3a9b8] mb-1.5">
+              Password
+            </label>
             <div className="relative">
               <input
                 id="password"
@@ -243,15 +224,19 @@ export default function AuthPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="input-field pr-10 text-xs py-2.5"
+                className="input-field pr-10 text-xs h-10"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors p-1"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#7a8296] hover:text-[#eef0f5] transition-colors p-1"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" strokeWidth={1.5} />
+                ) : (
+                  <Eye className="w-4 h-4" strokeWidth={1.5} />
+                )}
               </button>
             </div>
           </div>
@@ -259,27 +244,26 @@ export default function AuthPage() {
           <button
             type="submit"
             disabled={loading || isGoogleLoading}
-            className="btn-primary w-full py-2.5 text-xs font-semibold mt-2"
+            className="btn-primary w-full h-10 text-xs mt-2"
           >
             {loading ? (
               <Spinner size="sm" />
             ) : isSignUp ? (
-              'Create Account'
+              'Create account'
             ) : (
-              'Sign In'
+              'Sign in'
             )}
           </button>
         </form>
 
-        {/* Clear Cache Tool */}
-        <div className="mt-5 pt-4 border-t border-[#1e293b] text-center">
+        <div className="mt-5 pt-4 border-t border-white/[0.08] text-center">
           <button
             type="button"
             onClick={wipeAllLocalData}
-            className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors inline-flex items-center gap-1 font-mono"
+            className="text-xs text-[#7a8296] hover:text-[#a3a9b8] transition-colors inline-flex items-center gap-1.5 font-mono"
             title="Purge cached session tokens"
           >
-            <RefreshCw className="w-3 h-3" aria-hidden="true" />
+            <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
             Reset local auth storage
           </button>
         </div>

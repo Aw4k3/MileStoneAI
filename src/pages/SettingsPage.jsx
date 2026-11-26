@@ -12,6 +12,9 @@ import {
   Palette,
   Sun,
   Moon,
+  GraduationCap,
+  Target,
+  Users,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Modal from '../components/common/Modal';
@@ -21,10 +24,13 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../hooks/useSettings';
 import { useRoadmaps } from '../hooks/useRoadmaps';
 import { useStats } from '../hooks/useStats';
-import {
-  MENTOR_PERSONAS,
-  PACING_OPTIONS,
-} from '../lib/constants';
+import { MENTOR_PERSONAS, PACING_OPTIONS } from '../lib/constants';
+
+const PERSONA_ICONS = {
+  tutor: GraduationCap,
+  coach: Target,
+  peer: Users,
+};
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
@@ -34,7 +40,6 @@ export default function SettingsPage() {
   const { stats } = useStats();
 
   const [savedNotice, setSavedNotice] = useState(false);
-
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
   const [isWiping, setIsWiping] = useState(false);
@@ -107,7 +112,7 @@ export default function SettingsPage() {
       <Layout>
         <div className="py-24 flex flex-col items-center justify-center space-y-3">
           <Spinner size="lg" />
-          <p className="text-xs text-slate-400 font-mono">Loading user preferences…</p>
+          <p className="text-xs text-[#7a8296] font-mono">Loading user preferences…</p>
         </div>
       </Layout>
     );
@@ -117,26 +122,27 @@ export default function SettingsPage() {
     <Layout>
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-[#1e293b]">
+        <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <SettingsIcon className="w-5 h-5 text-blue-400" aria-hidden="true" />
-              Settings &amp; Preferences
+            <h1 className="text-2xl font-medium text-[#eef0f5] flex items-center gap-2.5 tracking-tight">
+              <SettingsIcon className="w-5 h-5 text-[#7a8296]" strokeWidth={1.5} aria-hidden="true" />
+              Settings
             </h1>
-            <p className="text-xs text-slate-300 mt-1">
-              Configure your visual theme, mentor personality, notifications, and manage application data.
+            <p className="text-xs sm:text-sm text-[#7a8296] mt-1">
+              Visual theme, default mentor tone, notifications, and account data
             </p>
           </div>
 
           <AnimatePresence>
             {savedNotice && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-semibold flex items-center gap-1.5"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                className="px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-[#4cc38a] text-xs font-mono flex items-center gap-1.5"
               >
-                <Check className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+                <Check className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
                 Saved
               </motion.div>
             )}
@@ -144,19 +150,23 @@ export default function SettingsPage() {
         </div>
 
         {dataWiped && (
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs" role="alert" aria-live="polite">
+          <div
+            className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs"
+            role="alert"
+            aria-live="polite"
+          >
             All user records wiped. Redirecting to landing page…
           </div>
         )}
 
-        {/* 1. Interface Theme Customization */}
-        <div className="p-5 sm:p-6 rounded-2xl bg-[#121824] border border-[#242f42] space-y-3.5">
-          <div className="flex items-center gap-2.5">
-            <Palette className="w-4 h-4 text-blue-400" aria-hidden="true" />
+        {/* 1. Interface Theme */}
+        <div className="p-5 sm:p-6 rounded-xl bg-[#11141c] border border-white/[0.08] space-y-4">
+          <div className="flex items-center gap-3">
+            <Palette className="w-4 h-4 text-[#7a8296] shrink-0" strokeWidth={1.5} aria-hidden="true" />
             <div>
-              <h2 className="text-sm font-bold text-white">Interface Theme</h2>
-              <p className="text-xs text-slate-400">
-                Customize your appearance preference. The selected theme persists across all pages and sessions.
+              <h2 className="text-sm font-medium text-[#eef0f5]">Interface theme</h2>
+              <p className="text-xs text-[#7a8296]">
+                Selected theme applies across all sessions
               </p>
             </div>
           </div>
@@ -167,28 +177,28 @@ export default function SettingsPage() {
               role="radio"
               aria-checked={theme === 'dark'}
               onClick={() => handleThemeChange('dark')}
-              className={`p-4 rounded-xl border text-left transition-colors flex items-start justify-between gap-3 ${
+              className={`p-4 rounded-lg border text-left transition-colors flex items-start justify-between gap-3 ${
                 theme === 'dark'
-                  ? 'bg-blue-600/15 border-blue-500 text-white ring-1 ring-blue-500/40 shadow-xs'
-                  : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200 hover:border-[#3b4c68]'
+                  ? 'active-step-surface text-[#eef0f5]'
+                  : 'bg-[#0b0d14] border-white/[0.08] text-[#7a8296] hover:text-[#eef0f5] hover:border-white/[0.18]'
               }`}
             >
               <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-[#161f2e] border border-[#242f42] text-blue-400">
-                  <Moon className="w-4 h-4" aria-hidden="true" />
+                <div className="w-8 h-8 rounded-lg bg-[#1a1e28] border border-white/[0.08] flex items-center justify-center text-blue-400 shrink-0">
+                  <Moon className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
                 </div>
                 <div>
-                  <p className="font-semibold text-xs text-white">Dark Mode</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                    Deep slate palette with low glare, designed for focus and extended study sessions.
+                  <p className="font-medium text-xs text-[#eef0f5]">Dark mode</p>
+                  <p className="text-xs text-[#7a8296] mt-0.5 leading-relaxed">
+                    Low-glare ink surfaces for extended reading and study sessions.
                   </p>
                 </div>
               </div>
               <div
                 className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
                   theme === 'dark'
-                    ? 'bg-blue-600 border-blue-500 text-white'
-                    : 'border-slate-600 bg-[#121824]'
+                    ? 'bg-blue-500 border-blue-500 text-white'
+                    : 'border-white/[0.2] bg-[#11141c]'
                 }`}
               >
                 {theme === 'dark' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -200,28 +210,28 @@ export default function SettingsPage() {
               role="radio"
               aria-checked={theme === 'light'}
               onClick={() => handleThemeChange('light')}
-              className={`p-4 rounded-xl border text-left transition-colors flex items-start justify-between gap-3 ${
+              className={`p-4 rounded-lg border text-left transition-colors flex items-start justify-between gap-3 ${
                 theme === 'light'
-                  ? 'bg-blue-600/15 border-blue-500 text-white ring-1 ring-blue-500/40 shadow-xs'
-                  : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200 hover:border-[#3b4c68]'
+                  ? 'active-step-surface text-[#eef0f5]'
+                  : 'bg-[#0b0d14] border-white/[0.08] text-[#7a8296] hover:text-[#eef0f5] hover:border-white/[0.18]'
               }`}
             >
               <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-[#161f2e] border border-[#242f42] text-amber-400">
-                  <Sun className="w-4 h-4" aria-hidden="true" />
+                <div className="w-8 h-8 rounded-lg bg-[#1a1e28] border border-white/[0.08] flex items-center justify-center text-amber-400 shrink-0">
+                  <Sun className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
                 </div>
                 <div>
-                  <p className="font-semibold text-xs text-white">Light Mode</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                    Clean, crisp high-contrast surfaces designed for readability in bright environments.
+                  <p className="font-medium text-xs text-[#eef0f5]">Light mode</p>
+                  <p className="text-xs text-[#7a8296] mt-0.5 leading-relaxed">
+                    High-contrast daylight paper surfaces for bright environments.
                   </p>
                 </div>
               </div>
               <div
                 className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
                   theme === 'light'
-                    ? 'bg-blue-600 border-blue-500 text-white'
-                    : 'border-slate-600 bg-[#121824]'
+                    ? 'bg-blue-500 border-blue-500 text-white'
+                    : 'border-white/[0.2] bg-[#11141c]'
                 }`}
               >
                 {theme === 'light' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -230,21 +240,26 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* 2. Mentor Persona */}
-        <div className="p-5 sm:p-6 rounded-2xl bg-[#121824] border border-[#242f42] space-y-3.5">
-          <div className="flex items-center gap-2.5">
-            <UserCircle className="w-4 h-4 text-blue-400" aria-hidden="true" />
+        {/* 2. Default Mentor Persona */}
+        <div className="p-5 sm:p-6 rounded-xl bg-[#11141c] border border-white/[0.08] space-y-4">
+          <div className="flex items-center gap-3">
+            <UserCircle className="w-4 h-4 text-[#7a8296] shrink-0" strokeWidth={1.5} aria-hidden="true" />
             <div>
-              <h2 className="text-sm font-bold text-white">Default Mentor Persona</h2>
-              <p className="text-xs text-slate-400">
-                Select the default tone and pedagogical style for your 24/7 AI mentor.
+              <h2 className="text-sm font-medium text-[#eef0f5]">Default mentor persona</h2>
+              <p className="text-xs text-[#7a8296]">
+                Default feedback style inside blueprint mentor chats
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5" role="radiogroup" aria-label="Default Mentor Persona">
+          <div
+            className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+            role="radiogroup"
+            aria-label="Default Mentor Persona"
+          >
             {MENTOR_PERSONAS.map((p) => {
               const isSelected = settings?.mentor_persona === p.value;
+              const Icon = PERSONA_ICONS[p.value] || UserCircle;
               return (
                 <button
                   key={p.value}
@@ -252,16 +267,18 @@ export default function SettingsPage() {
                   role="radio"
                   aria-checked={isSelected}
                   onClick={() => handlePersonaChange(p.value)}
-                  className={`p-3.5 rounded-xl border text-left transition-colors flex items-center gap-3 ${
+                  className={`p-3.5 rounded-lg border text-left transition-colors flex items-center gap-3 ${
                     isSelected
-                      ? 'bg-blue-600/10 border-blue-500 text-white shadow-xs'
-                      : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-slate-200 hover:border-[#3b4c68]'
+                      ? 'active-step-surface text-[#eef0f5]'
+                      : 'bg-[#0b0d14] border-white/[0.08] text-[#7a8296] hover:text-[#eef0f5] hover:border-white/[0.18]'
                   }`}
                 >
-                  <span className="text-xl p-1 bg-[#161f2e] rounded-lg border border-[#242f42]" aria-hidden="true">{p.emoji}</span>
-                  <div>
-                    <p className="font-semibold text-xs text-white">{p.label}</p>
-                    <p className="text-[10px] text-slate-500 capitalize font-mono">{p.value} mode</p>
+                  <div className="w-8 h-8 rounded-lg bg-[#1a1e28] border border-white/[0.08] flex items-center justify-center text-[#a3a9b8] shrink-0">
+                    <Icon className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-xs text-[#eef0f5] truncate">{p.label}</p>
+                    <p className="text-[11px] text-[#7a8296] font-mono truncate">{p.hint}</p>
                   </div>
                 </button>
               );
@@ -270,27 +287,27 @@ export default function SettingsPage() {
         </div>
 
         {/* 3. Notifications */}
-        <div className="p-5 sm:p-6 rounded-2xl bg-[#121824] border border-[#242f42] space-y-3.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Bell className="w-4 h-4 text-blue-400" aria-hidden="true" />
+        <div className="p-5 sm:p-6 rounded-xl bg-[#11141c] border border-white/[0.08] space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Bell className="w-4 h-4 text-[#7a8296] shrink-0" strokeWidth={1.5} aria-hidden="true" />
               <div>
-                <h2 className="text-sm font-bold text-white">Milestone Push Notifications</h2>
-                <p className="text-xs text-slate-400">
-                  Receive browser notifications when upcoming milestone deliverables are scheduled.
+                <h2 className="text-sm font-medium text-[#eef0f5]">Milestone reminders</h2>
+                <p className="text-xs text-[#7a8296]">
+                  Browser notifications when scheduled milestone deliverables arrive
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={handleNotificationToggle}
-              className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
-                settings?.push_enabled ? 'bg-blue-600' : 'bg-[#1a2332] border border-[#242f42]'
+              className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
+                settings?.push_enabled ? 'bg-blue-500' : 'bg-[#1a1e28] border border-white/[0.12]'
               }`}
               aria-label="Toggle push notifications"
             >
               <div
-                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${
                   settings?.push_enabled ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
@@ -298,18 +315,20 @@ export default function SettingsPage() {
           </div>
 
           {settings?.push_enabled && (
-            <div className="pt-2 border-t border-[#1e293b] space-y-2">
-              <label className="text-xs font-mono uppercase text-slate-400">Notification Pacing Cadence</label>
+            <div className="pt-4 border-t border-white/[0.08] space-y-2.5">
+              <label className="text-xs font-mono text-[#7a8296] block">
+                Notification cadence
+              </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {PACING_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => handlePacingChange(opt.value)}
-                    className={`py-2 px-3 rounded-lg border text-xs capitalize transition-colors ${
+                    className={`h-9 px-3 rounded-lg border text-xs transition-colors ${
                       settings?.notification_pacing === opt.value
-                        ? 'bg-blue-600/10 border-blue-500 text-white font-semibold'
-                        : 'bg-[#0e141f] border-[#242f42] text-slate-400 hover:text-white'
+                        ? 'active-step-surface text-[#eef0f5] font-medium'
+                        : 'bg-[#0b0d14] border-white/[0.08] text-[#7a8296] hover:text-[#eef0f5]'
                     }`}
                   >
                     {opt.label}
@@ -320,47 +339,47 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* 4. Data Export & Portability */}
-        <div className="p-5 sm:p-6 rounded-2xl bg-[#121824] border border-[#242f42] space-y-3.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Download className="w-4 h-4 text-blue-400" aria-hidden="true" />
+        {/* 4. Data Export */}
+        <div className="p-5 sm:p-6 rounded-xl bg-[#11141c] border border-white/[0.08]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Download className="w-4 h-4 text-[#7a8296] shrink-0" strokeWidth={1.5} aria-hidden="true" />
               <div>
-                <h2 className="text-sm font-bold text-white">Complete Data Portability</h2>
-                <p className="text-xs text-slate-400">
-                  Export complete application state, user progress, roadmaps, and chat transcripts to JSON.
+                <h2 className="text-sm font-medium text-[#eef0f5]">Data portability</h2>
+                <p className="text-xs text-[#7a8296]">
+                  Download blueprints, milestones, progress metrics, and settings as JSON
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={handleExportAllData}
-              className="btn-secondary text-xs py-2 px-3.5 inline-flex items-center gap-1.5"
+              className="btn-secondary text-xs h-9 px-3.5 shrink-0 self-start sm:self-auto"
             >
-              <Download className="w-3.5 h-3.5" aria-hidden="true" />
-              Export JSON Backup
+              <Download className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+              Export JSON backup
             </button>
           </div>
         </div>
 
         {/* 5. Danger Zone */}
-        <div className="p-5 sm:p-6 rounded-2xl bg-rose-950/10 border border-rose-500/20 space-y-3.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Trash2 className="w-4 h-4 text-rose-400" aria-hidden="true" />
+        <div className="p-5 sm:p-6 rounded-xl bg-rose-950/10 border border-rose-500/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Trash2 className="w-4 h-4 text-[#e5484d] shrink-0" strokeWidth={1.5} aria-hidden="true" />
               <div>
-                <h2 className="text-sm font-bold text-rose-300">Wipe All Account Data</h2>
-                <p className="text-xs text-slate-400">
-                  Permanently erase all generated blueprints, milestone logs, chat conversations, and earned XP.
+                <h2 className="text-sm font-medium text-rose-200">Erase all account data</h2>
+                <p className="text-xs text-[#7a8296]">
+                  Permanently remove all blueprints, milestones, mentor logs, and earned XP
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setShowDeleteModal(true)}
-              className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-colors shrink-0"
+              className="h-9 px-4 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-medium text-xs transition-colors shrink-0 self-start sm:self-auto"
             >
-              Erase Data
+              Erase data
             </button>
           </div>
         </div>
@@ -370,17 +389,20 @@ export default function SettingsPage() {
       <Modal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
-        title="Confirm Data Destruction"
+        title="Confirm data destruction"
       >
         <form onSubmit={handleConfirmWipe} className="space-y-4">
-          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
-            <span>This action cannot be undone. All milestones, chat histories, and progress will be erased permanently.</span>
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-200 text-xs flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-[#e5484d] mt-0.5" strokeWidth={1.5} aria-hidden="true" />
+            <span>
+              This action cannot be undone. All milestones, chat histories, and progress will be
+              erased permanently.
+            </span>
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="confirm-delete-input" className="text-xs text-slate-300 block">
-              Type <strong className="text-rose-400 font-mono">DELETE</strong> to authorize data wipe:
+            <label htmlFor="confirm-delete-input" className="text-xs text-[#a3a9b8] block">
+              Type <strong className="text-[#e5484d] font-mono">DELETE</strong> to authorize data wipe
             </label>
             <input
               id="confirm-delete-input"
@@ -391,7 +413,7 @@ export default function SettingsPage() {
               value={deleteConfirmationInput}
               onChange={(e) => setDeleteConfirmationInput(e.target.value)}
               placeholder="DELETE"
-              className="input-field text-xs font-mono bg-[#0b0f17]"
+              className="input-field text-xs font-mono h-10"
               autoFocus
             />
           </div>
@@ -400,16 +422,16 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={() => setShowDeleteModal(false)}
-              className="btn-secondary text-xs py-2 px-4"
+              className="btn-secondary text-xs h-9 px-4"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={deleteConfirmationInput !== 'DELETE' || isWiping}
-              className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-semibold text-xs transition-colors"
+              className="h-9 px-4 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-medium text-xs transition-colors"
             >
-              {isWiping ? 'Erasing…' : 'Confirm Erase'}
+              {isWiping ? 'Erasing…' : 'Confirm erase'}
             </button>
           </div>
         </form>

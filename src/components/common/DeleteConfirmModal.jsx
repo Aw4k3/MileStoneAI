@@ -16,29 +16,29 @@ export default function DeleteConfirmModal({
     <Modal
       isOpen={isOpen}
       onClose={isDeleting ? () => {} : onClose}
-      title={`Delete ${itemType}`}
+      title={`Delete ${itemType.toLowerCase()}`}
       maxWidth="max-w-md"
     >
       <div className="space-y-4">
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
-            <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+          <div className="w-8 h-8 rounded-lg bg-rose-500/15 text-[#e5484d] flex items-center justify-center shrink-0 mt-0.5">
+            <AlertTriangle className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
           </div>
-          <div className="space-y-1 text-xs text-slate-300 leading-relaxed">
-            <p className="font-semibold text-rose-200">
+          <div className="space-y-1 text-xs text-[#a3a9b8] leading-relaxed">
+            <p className="font-medium text-rose-200">
               This action cannot be undone.
             </p>
             <p>
-              Are you sure you want to delete{' '}
-              <strong className="text-white font-semibold break-words">
+              Deleting{' '}
+              <strong className="text-[#eef0f5] font-medium break-words">
                 &ldquo;{itemTitle}&rdquo;
-              </strong>
-              ? All associated milestones, checklists, and progress will be permanently removed.
+              </strong>{' '}
+              permanently removes its milestones, deliverables, and mentor history.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#1e293b]">
+        <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/[0.08]">
           <button
             type="button"
             onClick={onClose}
@@ -51,7 +51,7 @@ export default function DeleteConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={isDeleting}
-            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs inline-flex items-center gap-1.5 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-50 shadow-sm"
+            className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-medium text-xs inline-flex items-center gap-1.5 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-50"
           >
             {isDeleting ? (
               <>
@@ -60,8 +60,8 @@ export default function DeleteConfirmModal({
               </>
             ) : (
               <>
-                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Delete {itemType}</span>
+                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+                <span>Delete {itemType.toLowerCase()}</span>
               </>
             )}
           </button>

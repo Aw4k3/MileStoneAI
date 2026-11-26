@@ -17,7 +17,7 @@ const DocsPage = lazy(() => import('./pages/DocsPage'));
 
 function RouteLoadingFallback() {
   return (
-    <div className="min-h-screen bg-[#0b0f17] flex items-center justify-center">
+    <div className="min-h-screen bg-[#0b0d14] flex items-center justify-center">
       <Spinner size="lg" />
     </div>
   );
@@ -32,7 +32,7 @@ export default function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
-        <div className="min-h-screen bg-slate-950 text-slate-100 transition-colors duration-150">
+        <div className="min-h-screen bg-[#0b0d14] text-[#eef0f5] transition-colors duration-150">
           <Suspense fallback={<RouteLoadingFallback />}>
             <Routes>
               <Route path="/" element={<LandingPage />} />

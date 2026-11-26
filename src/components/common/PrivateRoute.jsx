@@ -9,7 +9,7 @@ export default function PrivateRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#0b0d14] flex items-center justify-center">
         <Spinner size="lg" />
       </div>
     );

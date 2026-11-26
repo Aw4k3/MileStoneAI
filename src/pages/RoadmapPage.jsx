@@ -13,7 +13,6 @@ import {
   Calendar,
   ExternalLink,
   Target,
-  Sparkles,
   BookOpen,
   Video,
   FileText,
@@ -26,6 +25,7 @@ import {
   Hammer,
   ArrowLeft,
   AlertCircle,
+  Award,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import ProgressRing from '../components/common/ProgressRing';
@@ -43,9 +43,9 @@ import {
 import { getMilestoneLabel, getPacingLabel } from '../lib/constants';
 
 const DIFFICULTY_STYLES = {
-  beginner: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  intermediate: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  advanced: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+  beginner: 'bg-emerald-500/10 text-[#4cc38a] border-emerald-500/20',
+  intermediate: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  advanced: 'bg-rose-500/10 text-[#e5484d] border-rose-500/20',
 };
 
 const RESOURCE_META = {
@@ -112,7 +112,7 @@ export default function RoadmapPage() {
       <Layout>
         <div className="py-24 flex flex-col items-center justify-center space-y-3">
           <Spinner size="lg" />
-          <p className="text-xs text-slate-400 font-mono">Loading blueprint specification…</p>
+          <p className="text-xs text-[#7a8296] font-mono">Loading blueprint specification…</p>
         </div>
       </Layout>
     );
@@ -122,18 +122,18 @@ export default function RoadmapPage() {
     return (
       <Layout>
         <div className="py-20 flex flex-col items-center justify-center text-center space-y-5">
-          <div className="w-14 h-14 rounded-2xl bg-[#121824] border border-[#242f42] flex items-center justify-center">
-            <AlertCircle className="w-7 h-7 text-slate-400" aria-hidden="true" />
+          <div className="w-12 h-12 rounded-xl bg-[#11141c] border border-white/[0.08] flex items-center justify-center">
+            <AlertCircle className="w-6 h-6 text-[#7a8296]" strokeWidth={1.5} aria-hidden="true" />
           </div>
           <div className="space-y-1.5">
-            <h1 className="text-xl font-bold text-white">Blueprint Not Found</h1>
-            <p className="text-xs text-slate-400 max-w-xs">
-              This course blueprint doesn&apos;t exist or may have been deleted.
+            <h1 className="text-xl font-medium text-[#eef0f5]">Blueprint not found</h1>
+            <p className="text-xs text-[#7a8296] max-w-xs">
+              This course blueprint doesn&apos;t exist or may have been removed.
             </p>
           </div>
-          <Link to="/dashboard" className="btn-primary text-xs py-2.5 px-5 inline-flex items-center gap-2">
-            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
-            Back to Dashboard
+          <Link to="/dashboard" className="btn-primary text-xs h-9 px-5">
+            <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+            Back to overview
           </Link>
         </div>
       </Layout>
@@ -150,6 +150,7 @@ export default function RoadmapPage() {
   const diffKey = String(roadmap.difficulty || 'intermediate').toLowerCase();
   const diffClass = DIFFICULTY_STYLES[diffKey] || DIFFICULTY_STYLES.intermediate;
   const allExpanded = milestones.length > 0 && milestones.every((m) => expandedIds[m.id]);
+  const activeMilestoneId = milestones.find((m) => !m.is_completed)?.id;
 
   const toggleExpandAll = () => {
     if (allExpanded) {
@@ -220,7 +221,7 @@ export default function RoadmapPage() {
       });
 
       setRebalanceToast(
-        res?.message || 'Schedule adapted: Remaining milestones redistributed across timeline.'
+        res?.message || 'Schedule adapted: remaining milestones redistributed across timeline.'
       );
       setTimeout(() => setRebalanceToast(''), 4500);
     } catch (err) {
@@ -316,14 +317,14 @@ export default function RoadmapPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Back Breadcrumb */}
+        {/* Back link */}
         <div>
           <Link
             to="/dashboard"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#7a8296] hover:text-[#eef0f5] transition-colors"
           >
-            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
-            Back to Dashboard
+            <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+            Overview
           </Link>
         </div>
 
@@ -331,19 +332,20 @@ export default function RoadmapPage() {
         <AnimatePresence>
           {rebalanceToast && (
             <motion.div
-              initial={{ opacity: 0, y: -8 }}
+              initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="p-3.5 rounded-xl bg-blue-950/40 border border-blue-500/40 text-blue-200 text-xs flex items-center justify-between shadow-lg"
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+              className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-blue-300 text-xs flex items-center justify-between"
             >
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-blue-400" aria-hidden="true" />
+                <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" strokeWidth={1.5} aria-hidden="true" />
                 <span>{rebalanceToast}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setRebalanceToast('')}
-                className="text-xs text-blue-300 font-semibold hover:text-white"
+                className="text-xs text-blue-400 font-medium hover:text-[#eef0f5]"
               >
                 Dismiss
               </button>
@@ -351,156 +353,156 @@ export default function RoadmapPage() {
           )}
         </AnimatePresence>
 
-        {/* Blueprint Overview Card */}
-        <div className="p-5 sm:p-7 rounded-2xl bg-[#121824] border border-[#242f42] space-y-5">
+        {/* Blueprint Overview Panel */}
+        <div className="p-6 rounded-2xl bg-[#11141c] border border-white/[0.1] space-y-6">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-            <div className="space-y-2.5 max-w-2xl">
-              <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] tnum">
-                <span className={`px-2.5 py-0.5 rounded-full border font-semibold uppercase ${diffClass}`}>
+            <div className="space-y-3 max-w-2xl">
+              <div className="flex flex-wrap items-center gap-2 font-mono text-xs tnum">
+                <span className={`px-2 py-0.5 rounded border ${diffClass}`}>
                   {roadmap.difficulty}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 inline-flex items-center gap-1">
-                  <Clock className="w-3 h-3" aria-hidden="true" />
-                  {estimatedWeeks} Weeks ({roadmap.duration_months}{' '}
-                  {roadmap.duration_months === 1 ? 'Month' : 'Months'})
+                <span className="px-2 py-0.5 rounded bg-[#0b0d14] text-[#a3a9b8] border border-white/[0.08] inline-flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#7a8296]" strokeWidth={1.5} aria-hidden="true" />
+                  {estimatedWeeks} weeks ({roadmap.duration_months}{' '}
+                  {roadmap.duration_months === 1 ? 'mo' : 'mo'})
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-[#0e141f] text-slate-300 border border-[#1e293b]">
+                <span className="px-2 py-0.5 rounded bg-[#0b0d14] text-[#7a8296] border border-white/[0.08]">
                   {getPacingLabel(roadmap.pacing)}
                 </span>
               </div>
 
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-medium text-[#eef0f5] tracking-tight">
                 {roadmap.title}
               </h1>
 
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              <p className="text-xs sm:text-sm text-[#a3a9b8] leading-relaxed">
                 {roadmap.goal_summary}
               </p>
             </div>
 
-            {/* Circular Progress Gauge */}
-            <div className="flex items-center gap-3.5 p-3.5 rounded-xl bg-[#0e141f] border border-[#1e293b] shrink-0 self-start">
-              <ProgressRing progress={progressPercent} size={64} strokeWidth={5} />
-              <div className="text-left font-mono">
-                <span className="text-[11px] text-slate-400 block uppercase">Progress</span>
-                <p className="text-lg font-bold text-white tnum">
+            {/* Progress Moment */}
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-[#0b0d14] border border-white/[0.08] shrink-0 self-start">
+              <ProgressRing progress={progressPercent} size={60} strokeWidth={4.5} />
+              <div className="font-mono">
+                <span className="text-xs text-[#7a8296] block">Completion</span>
+                <p className="text-xl font-medium text-[#eef0f5] tnum">
                   {completedCount}
-                  <span className="text-xs text-slate-500 font-normal">/{milestones.length}</span>
+                  <span className="text-xs text-[#7a8296] font-normal">/{milestones.length}</span>
                 </p>
-                <span className="text-[10px] text-emerald-400 font-medium">completed</span>
+                <span className="text-[11px] text-[#4cc38a]">verified</span>
               </div>
             </div>
           </div>
 
-          {/* Real-Time Progress Bar & Milestone Counters */}
+          {/* Progress Bar + Ledger Counts */}
           <div className="space-y-3">
             <div>
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="text-slate-400 font-medium">Overall Blueprint Completion</span>
-                <span className="font-mono font-bold text-white tnum">{progressPercent}%</span>
+              <div className="flex items-center justify-between text-xs mb-2">
+                <span className="text-[#7a8296]">Overall progress</span>
+                <span className="font-mono text-[#eef0f5] tnum">{progressPercent}%</span>
               </div>
-              <div className="h-2 rounded-full bg-[#0b0f17] border border-[#1e293b] overflow-hidden">
+              <div className="h-1.5 rounded-full bg-[#0b0d14] border border-white/[0.08] overflow-hidden">
                 <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progressPercent}%` }}
-                  transition={{ duration: 0.5, ease: 'easeOut' }}
-                  className="h-full bg-blue-600 rounded-full"
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: progressPercent / 100 }}
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  className={`h-full origin-left ${
+                    progressPercent === 100 ? 'bg-[#4cc38a]' : 'bg-blue-500'
+                  }`}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 font-mono">
-              <div className="p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] text-center">
-                <p className="text-lg font-bold text-emerald-400 tnum">{completedCount}</p>
-                <p className="text-[11px] text-slate-400">Completed</p>
+            <div className="grid grid-cols-3 bg-[#0b0d14] border border-white/[0.08] rounded-xl divide-x divide-white/[0.08] font-mono">
+              <div className="p-3.5 text-center">
+                <p className="text-lg font-medium text-[#4cc38a] tnum">{completedCount}</p>
+                <p className="text-xs text-[#7a8296]">Completed</p>
               </div>
-              <div className="p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] text-center">
-                <p className="text-lg font-bold text-blue-400 tnum">{remainingCount}</p>
-                <p className="text-[11px] text-slate-400">Remaining</p>
+              <div className="p-3.5 text-center">
+                <p className="text-lg font-medium text-blue-400 tnum">{remainingCount}</p>
+                <p className="text-xs text-[#7a8296]">Remaining</p>
               </div>
-              <div className="p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] text-center">
-                <p className="text-lg font-bold text-white tnum">{milestones.length}</p>
-                <p className="text-[11px] text-slate-400">Total</p>
+              <div className="p-3.5 text-center">
+                <p className="text-lg font-medium text-[#eef0f5] tnum">{milestones.length}</p>
+                <p className="text-xs text-[#7a8296]">Total</p>
               </div>
             </div>
           </div>
 
           {/* Action Toolbar */}
-          <div className="pt-4 border-t border-[#1e293b] flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="pt-4 border-t border-white/[0.08] flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setShowOutcomesModal(true)}
-                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
+                className="btn-secondary text-xs h-8 px-3"
               >
-                <Target className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
-                Expected Outcomes ({(roadmap.key_outcomes || []).length})
+                <Target className="w-3.5 h-3.5 text-[#7a8296]" strokeWidth={1.5} aria-hidden="true" />
+                Outcomes ({(roadmap.key_outcomes || []).length})
               </button>
 
               <button
                 type="button"
                 onClick={handleRebalance}
                 disabled={isRebalancing}
-                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 disabled:opacity-50"
-                title="Redistribute remaining milestones evenly without losing progress"
+                className="btn-secondary text-xs h-8 px-3 disabled:opacity-50"
+                title="Redistribute remaining milestones evenly"
               >
                 <RefreshCw
-                  className={`w-3.5 h-3.5 text-amber-400 ${isRebalancing ? 'animate-spin' : ''}`}
+                  className={`w-3.5 h-3.5 text-[#7a8296] ${isRebalancing ? 'animate-spin' : ''}`}
+                  strokeWidth={1.5}
                   aria-hidden="true"
                 />
-                {isRebalancing ? 'Adapting…' : 'Adaptive Rebalance'}
+                {isRebalancing ? 'Adapting…' : 'Rebalance'}
               </button>
 
               <button
                 type="button"
                 onClick={handleExportMarkdown}
-                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
-                title="Export complete blueprint to Markdown document"
+                className="btn-secondary text-xs h-8 px-3"
+                title="Export blueprint to Markdown"
               >
-                <Download className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                <Download className="w-3.5 h-3.5 text-[#7a8296]" strokeWidth={1.5} aria-hidden="true" />
                 Export .md
               </button>
 
               <button
                 type="button"
                 onClick={handleExportCalendar}
-                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
-                title="Sync calendar with due dates"
+                className="btn-secondary text-xs h-8 px-3"
+                title="Export schedule to iCalendar"
               >
-                <Calendar className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                <Calendar className="w-3.5 h-3.5 text-[#7a8296]" strokeWidth={1.5} aria-hidden="true" />
                 Sync .ics
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(true)}
-                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 text-slate-400 hover:text-rose-400 hover:border-rose-500/30 transition-colors"
-                title="Delete this blueprint"
+                className="btn-secondary text-xs h-8 px-3 text-[#7a8296] hover:text-[#e5484d] hover:border-rose-500/30"
+                title="Delete blueprint"
               >
-                <Trash2 className="w-3.5 h-3.5 text-rose-400" aria-hidden="true" />
-                Delete Blueprint
+                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+                Delete
               </button>
             </div>
 
-            <Link
-              to={`/roadmap/${roadmap.id}/chat`}
-              className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-2 font-semibold"
-            >
-              <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" />
-              Chat with Mentor
+            <Link to={`/roadmap/${roadmap.id}/chat`} className="btn-primary text-xs h-8 px-4">
+              <MessageSquare className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+              Mentor chat
             </Link>
           </div>
         </div>
 
-        {/* Milestones Curriculum Timeline */}
-        <div className="space-y-3.5">
+        {/* Milestone Route Timeline */}
+        <div className="space-y-4">
           <div className="flex items-center justify-between px-1 gap-2">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-blue-400" aria-hidden="true" />
-              Milestone Timeline
+            <h2 className="text-sm font-medium text-[#eef0f5] flex items-center gap-2">
+              <Layers className="w-4 h-4 text-[#7a8296]" strokeWidth={1.5} aria-hidden="true" />
+              Milestone timeline
               {progressPercent === 100 && milestones.length > 0 && (
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-                  Complete!
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-[#4cc38a] border border-emerald-500/20">
+                  Complete
                 </span>
               )}
             </h2>
@@ -510,7 +512,7 @@ export default function RoadmapPage() {
                 onClick={toggleExpandAll}
                 className="text-xs font-mono text-blue-400 hover:text-blue-300 transition-colors"
               >
-                {allExpanded ? 'Collapse All' : 'Expand All'}
+                {allExpanded ? 'Collapse all' : 'Expand all'}
               </button>
             )}
           </div>
@@ -518,152 +520,147 @@ export default function RoadmapPage() {
           <div className="space-y-3">
             {milestones.map((m, idx) => {
               const isExpanded = Boolean(expandedIds[m.id]);
+              const isCurrentTarget = activeMilestoneId === m.id;
               const deliverables = m.deliverables || [];
               const completedDeliverables = deliverables.filter((d) => d.is_completed).length;
               const timeLabel = getMilestoneLabel(
                 m.estimated_week_offset || idx + 1,
                 roadmap.pacing
               );
+              const milestoneIndexStr = String(idx + 1).padStart(2, '0');
 
               return (
                 <div
                   key={m.id}
-                  className={`rounded-2xl border transition-colors duration-150 overflow-hidden ${
+                  className={`rounded-xl border transition-colors overflow-hidden ${
                     m.is_completed
-                      ? 'bg-[#0d131d] border-emerald-500/30'
-                      : 'bg-[#121824] border-[#242f42] hover:border-[#3b4c68]'
+                      ? 'bg-[#0b0d14] border-emerald-500/25'
+                      : isCurrentTarget
+                      ? 'bg-[#11141c] border-blue-500/40'
+                      : 'bg-[#11141c] border-white/[0.08] hover:border-white/[0.16]'
                   }`}
                 >
-                  {/* Status accent bar */}
-                  <div
-                    className={`w-full h-0.5 ${m.is_completed ? 'bg-emerald-500' : 'bg-blue-600'}`}
-                  />
-
-                  {/* Milestone Card Header */}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={isExpanded}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setExpandedIds((prev) => ({ ...prev, [m.id]: !prev[m.id] }));
-                      }
-                    }}
-                    className="p-4 sm:p-5 flex items-start gap-3.5 cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-2xl"
-                    onClick={() => setExpandedIds((prev) => ({ ...prev, [m.id]: !prev[m.id] }))}
-                  >
+                  {/* Milestone Header (Accessible split controls) */}
+                  <div className="p-4 sm:p-5 flex items-start gap-3.5">
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMilestoneToggle(m);
-                      }}
-                      className="mt-0.5 text-slate-500 hover:text-blue-400 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+                      onClick={() => handleMilestoneToggle(m)}
+                      className="mt-0.5 text-[#7a8296] hover:text-blue-400 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 rounded shrink-0"
                       aria-label={
                         m.is_completed ? 'Mark milestone incomplete' : 'Mark milestone complete'
                       }
                     >
                       {m.is_completed ? (
                         <CheckCircle2
-                          className="w-5 h-5 text-emerald-400 fill-emerald-400/10"
+                          className="w-5 h-5 text-[#4cc38a]"
+                          strokeWidth={1.5}
                           aria-hidden="true"
                         />
                       ) : (
-                        <Circle className="w-5 h-5" aria-hidden="true" />
+                        <Circle className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
                       )}
                     </button>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1 font-mono text-xs">
-                        <span className="text-[11px] text-blue-400 uppercase tracking-wider font-semibold tnum">
-                          {timeLabel}
-                        </span>
-                        <span className="text-[11px] text-slate-500 tnum">
-                          · Milestone {String(idx + 1).padStart(2, '0')}
-                        </span>
-                        {m.is_major && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
-                            <Brain className="w-3 h-3" aria-hidden="true" />
-                            Gated Quiz
-                          </span>
-                        )}
-                        <span className="text-[11px] text-blue-400 ml-auto tnum font-semibold">
-                          +{m.xp_reward || 150} XP
-                        </span>
-                      </div>
-
-                      <h3
-                        className={`text-sm sm:text-base font-bold tracking-tight transition-colors ${
-                          m.is_completed ? 'line-through text-slate-500' : 'text-white'
-                        }`}
-                      >
-                        {m.title}
-                      </h3>
-
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-1 font-mono text-[11px] tnum">
-                        {completedDeliverables} of {deliverables.length} deliverables complete
-                      </p>
-                    </div>
 
                     <button
                       type="button"
-                      className="p-1 rounded text-slate-400 hover:text-white"
-                      aria-label={isExpanded ? 'Collapse milestone details' : 'Expand milestone details'}
+                      aria-expanded={isExpanded}
+                      onClick={() =>
+                        setExpandedIds((prev) => ({ ...prev, [m.id]: !prev[m.id] }))
+                      }
+                      className="flex-1 min-w-0 text-left flex items-start justify-between gap-3 focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
                     >
-                      {isExpanded ? (
-                        <ChevronUp className="w-4 h-4" aria-hidden="true" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" aria-hidden="true" />
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1 font-mono text-xs">
+                          <span
+                            className={`font-medium tnum ${
+                              m.is_completed
+                                ? 'text-[#4cc38a]'
+                                : isCurrentTarget
+                                ? 'text-blue-400'
+                                : 'text-[#7a8296]'
+                            }`}
+                          >
+                            {milestoneIndexStr}
+                          </span>
+                          <span className="text-[#7a8296] tnum">· {timeLabel}</span>
+                          {m.is_major && (
+                            <span className="px-2 py-0.5 rounded text-[11px] bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-flex items-center gap-1">
+                              <Brain className="w-3 h-3" strokeWidth={1.5} aria-hidden="true" />
+                              Quiz gate
+                            </span>
+                          )}
+                          <span className="text-xs text-[#7a8296] ml-auto tnum">
+                            +{m.xp_reward || 150} XP
+                          </span>
+                        </div>
+
+                        <h3
+                          className={`text-sm sm:text-base font-medium tracking-tight transition-colors ${
+                            m.is_completed ? 'line-through text-[#7a8296]' : 'text-[#eef0f5]'
+                          }`}
+                        >
+                          {m.title}
+                        </h3>
+
+                        <p className="text-xs text-[#7a8296] mt-1 font-mono tnum">
+                          {completedDeliverables} of {deliverables.length} deliverables verified
+                        </p>
+                      </div>
+
+                      <span className="p-1 text-[#7a8296] hover:text-[#eef0f5] shrink-0 mt-0.5">
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
+                        )}
+                      </span>
                     </button>
                   </div>
 
-                  {/* Expanded Guided Mini-Course Body */}
+                  {/* Expanded Guided Module Body */}
                   <AnimatePresence initial={false}>
                     {isExpanded && (
                       <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.18 }}
-                        className="px-4 sm:px-5 pb-5 pt-2 border-t border-[#1e293b] space-y-5 overflow-hidden"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                        className="px-4 sm:px-5 pb-5 pt-4 border-t border-white/[0.08] space-y-5"
                       >
                         {m.description && (
-                          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed pt-2">
+                          <p className="text-xs sm:text-sm text-[#a3a9b8] leading-relaxed">
                             {m.description}
                           </p>
                         )}
 
-                        {/* 1. Learn — Learning Objectives */}
+                        {/* 1. Concepts & Objectives */}
                         {m.learning_objectives?.length > 0 && (
-                          <div className="space-y-2">
-                            <h4 className="text-[11px] font-mono font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                              <Target className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
-                              Learn · Concepts &amp; Objectives
+                          <div className="space-y-2.5">
+                            <h4 className="text-xs font-mono text-[#7a8296] flex items-center gap-2">
+                              <Target className="w-4 h-4 text-[#7a8296]" strokeWidth={1.5} aria-hidden="true" />
+                              Concepts &amp; objectives
                             </h4>
-                            <ul className="space-y-1.5">
+                            <ul className="space-y-1.5 pl-6">
                               {m.learning_objectives.map((obj, oIdx) => (
                                 <li
                                   key={oIdx}
-                                  className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-300"
+                                  className="list-disc text-xs sm:text-sm text-[#a3a9b8]"
                                 >
-                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 shrink-0" />
-                                  <span>{obj}</span>
+                                  {obj}
                                 </li>
                               ))}
                             </ul>
                           </div>
                         )}
 
-                        {/* 2. Watch & Read — Curated Learning Materials */}
+                        {/* 2. Study Resources */}
                         {(m.resources || []).length > 0 && (
-                          <div className="space-y-2">
-                            <h4 className="text-[11px] font-mono font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                              <BookOpen className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
-                              Watch &amp; Read · Course Materials
+                          <div className="space-y-2.5">
+                            <h4 className="text-xs font-mono text-[#7a8296] flex items-center gap-2">
+                              <BookOpen className="w-4 h-4 text-[#7a8296]" strokeWidth={1.5} aria-hidden="true" />
+                              Course resources
                             </h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               {m.resources.map((res, rIdx) => {
                                 const typeKey = String(res.type || 'course').toLowerCase();
                                 const meta = RESOURCE_META[typeKey] || RESOURCE_META.course;
@@ -672,39 +669,34 @@ export default function RoadmapPage() {
                                 const safeHref = sanitizeExternalUrl(res.url);
 
                                 const inner = (
-                                  <div className="flex items-start gap-2.5 w-full">
+                                  <div className="flex items-start gap-3 w-full">
                                     <Icon
-                                      className="w-4 h-4 text-blue-400 shrink-0 mt-0.5"
+                                      className="w-4 h-4 text-[#7a8296] shrink-0 mt-0.5"
+                                      strokeWidth={1.5}
                                       aria-hidden="true"
                                     />
                                     <div className="flex-1 min-w-0 space-y-1">
                                       <div className="flex items-start justify-between gap-2">
-                                        <span className="text-xs font-semibold text-slate-200 group-hover:text-white leading-snug">
+                                        <span className="text-xs font-medium text-[#eef0f5] leading-snug">
                                           {res.title}
                                         </span>
                                         {safeHref && (
                                           <ExternalLink
-                                            className="w-3 h-3 text-slate-500 group-hover:text-blue-400 shrink-0 mt-0.5"
+                                            className="w-3.5 h-3.5 text-[#7a8296] group-hover:text-blue-400 shrink-0 mt-0.5"
+                                            strokeWidth={1.5}
                                             aria-hidden="true"
                                           />
                                         )}
                                       </div>
                                       {res.description && (
-                                        <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">
+                                        <p className="text-xs text-[#7a8296] leading-relaxed line-clamp-2">
                                           {res.description}
                                         </p>
                                       )}
-                                      <div className="flex items-center gap-1.5 pt-0.5">
-                                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#161f2e] text-slate-300 border border-[#242f42]">
-                                          {meta.label}
-                                        </span>
-                                        <span
-                                          className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border ${
-                                            isFree
-                                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                              : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                          }`}
-                                        >
+                                      <div className="flex items-center gap-2 pt-0.5 font-mono text-[11px]">
+                                        <span className="text-[#7a8296]">{meta.label}</span>
+                                        <span className="text-[#7a8296]">·</span>
+                                        <span className={isFree ? 'text-[#4cc38a]' : 'text-amber-400'}>
                                           {isFree ? 'Free' : 'Paid'}
                                         </span>
                                       </div>
@@ -718,14 +710,14 @@ export default function RoadmapPage() {
                                     href={safeHref}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] hover:border-blue-500/40 group transition-colors flex"
+                                    className="p-3.5 rounded-lg bg-[#0b0d14] border border-white/[0.08] hover:border-white/[0.2] group transition-colors flex"
                                   >
                                     {inner}
                                   </a>
                                 ) : (
                                   <div
                                     key={rIdx}
-                                    className="p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] flex"
+                                    className="p-3.5 rounded-lg bg-[#0b0d14] border border-white/[0.08] flex"
                                   >
                                     {inner}
                                   </div>
@@ -735,21 +727,21 @@ export default function RoadmapPage() {
                           </div>
                         )}
 
-                        {/* 3. Practice — Guided Exercises */}
+                        {/* 3. Practice Exercises */}
                         {m.practical_exercises?.length > 0 && (
-                          <div className="space-y-2">
-                            <h4 className="text-[11px] font-mono font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                              <Dumbbell className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
-                              Practice · Practical Exercises
+                          <div className="space-y-2.5">
+                            <h4 className="text-xs font-mono text-[#7a8296] flex items-center gap-2">
+                              <Dumbbell className="w-4 h-4 text-[#7a8296]" strokeWidth={1.5} aria-hidden="true" />
+                              Practice exercises
                             </h4>
                             <ol className="space-y-1.5">
                               {m.practical_exercises.map((ex, eIdx) => (
                                 <li
                                   key={eIdx}
-                                  className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-300"
+                                  className="flex items-start gap-2.5 text-xs sm:text-sm text-[#a3a9b8]"
                                 >
-                                  <span className="text-xs font-bold font-mono text-slate-400 mt-0.5 shrink-0 tnum">
-                                    {String(eIdx + 1).padStart(2, '0')}.
+                                  <span className="text-xs font-mono text-[#7a8296] mt-0.5 shrink-0 tnum">
+                                    {String(eIdx + 1).padStart(2, '0')}
                                   </span>
                                   <span>{ex}</span>
                                 </li>
@@ -758,20 +750,20 @@ export default function RoadmapPage() {
                           </div>
                         )}
 
-                        {/* 4. Build — Hands-on Projects */}
+                        {/* 4. Hands-on Projects */}
                         {m.projects?.length > 0 && (
-                          <div className="space-y-2">
-                            <h4 className="text-[11px] font-mono font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                              <Hammer className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
-                              Build · Hands-on Projects
+                          <div className="space-y-2.5">
+                            <h4 className="text-xs font-mono text-[#7a8296] flex items-center gap-2">
+                              <Hammer className="w-4 h-4 text-[#7a8296]" strokeWidth={1.5} aria-hidden="true" />
+                              Hands-on projects
                             </h4>
                             <ul className="space-y-2">
                               {m.projects.map((proj, pIdx) => (
                                 <li
                                   key={pIdx}
-                                  className="p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] text-xs sm:text-sm text-slate-200 flex items-start gap-2.5"
+                                  className="p-3 rounded-lg bg-[#0b0d14] border border-white/[0.08] text-xs sm:text-sm text-[#eef0f5] flex items-start gap-2.5"
                                 >
-                                  <span aria-hidden="true">🛠️</span>
+                                  <Code className="w-4 h-4 text-[#7a8296] shrink-0 mt-0.5" strokeWidth={1.5} aria-hidden="true" />
                                   <span>{proj}</span>
                                 </li>
                               ))}
@@ -779,18 +771,18 @@ export default function RoadmapPage() {
                           </div>
                         )}
 
-                        {/* 5. Deliverables & Completion Checklist */}
+                        {/* 5. Deliverables Checklist */}
                         {deliverables.length > 0 && (
-                          <div className="space-y-2">
-                            <h4 className="text-[11px] font-mono font-semibold text-slate-300 uppercase tracking-wider block">
-                              Deliverables · Completion Checklist
+                          <div className="space-y-2.5">
+                            <h4 className="text-xs font-mono text-[#7a8296] block">
+                              Deliverables
                             </h4>
                             <div className="space-y-1.5">
                               {deliverables.map((del) => (
                                 <label
                                   key={del.id}
                                   htmlFor={`del-${del.id}`}
-                                  className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[#0e141f] border border-[#1e293b] hover:border-[#2d3a4e] cursor-pointer text-xs sm:text-sm transition-colors"
+                                  className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[#0b0d14] border border-white/[0.08] hover:border-white/[0.18] cursor-pointer text-xs sm:text-sm transition-colors"
                                 >
                                   <input
                                     id={`del-${del.id}`}
@@ -800,13 +792,13 @@ export default function RoadmapPage() {
                                     onChange={() =>
                                       toggleDeliverable(m.id, del.id, del.is_completed)
                                     }
-                                    className="mt-1 rounded border-slate-700 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                                    className="mt-1 rounded border-white/20 accent-blue-500"
                                   />
                                   <span
                                     className={
                                       del.is_completed
-                                        ? 'line-through text-slate-500'
-                                        : 'text-slate-200'
+                                        ? 'line-through text-[#7a8296]'
+                                        : 'text-[#eef0f5]'
                                     }
                                   >
                                     {del.title}
@@ -817,29 +809,29 @@ export default function RoadmapPage() {
                           </div>
                         )}
 
-                        {/* Bottom Milestone Completion Toggle */}
-                        <div className="pt-3 border-t border-[#1e293b] flex items-center justify-between gap-3">
-                          <span className="text-xs font-mono text-slate-400">
+                        {/* Completion Footer */}
+                        <div className="pt-4 border-t border-white/[0.08] flex items-center justify-between gap-3">
+                          <span className="text-xs font-mono text-[#7a8296] tnum">
                             {completedDeliverables}/{deliverables.length} deliverables verified
                           </span>
                           <button
                             type="button"
                             onClick={() => handleMilestoneToggle(m)}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                            className={`inline-flex items-center gap-2 px-4 h-9 rounded-lg text-xs font-medium border transition-colors ${
                               m.is_completed
-                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                                : 'bg-blue-600 border-blue-500 text-white hover:bg-blue-500'
+                                ? 'bg-emerald-500/10 border-emerald-500/30 text-[#4cc38a] hover:bg-emerald-500/15'
+                                : 'btn-primary border-transparent'
                             }`}
                           >
                             {m.is_completed ? (
                               <>
-                                <Circle className="w-3.5 h-3.5" aria-hidden="true" />
-                                Mark Incomplete
+                                <Circle className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+                                Mark incomplete
                               </>
                             ) : (
                               <>
-                                <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-                                Mark Milestone Complete
+                                <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+                                Mark milestone complete
                               </>
                             )}
                           </button>
@@ -853,48 +845,49 @@ export default function RoadmapPage() {
           </div>
         </div>
 
-        {/* Completion Celebration Banner */}
+        {/* Completion Banner */}
         {progressPercent === 100 && milestones.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2"
-          >
-            <div className="text-3xl" aria-hidden="true">🎉</div>
-            <h3 className="text-lg font-bold text-white">Blueprint Complete!</h3>
-            <p className="text-xs sm:text-sm text-slate-300">
-              Congratulations! You&apos;ve completed all {milestones.length} milestones in{' '}
-              <strong>{roadmap.title}</strong>.
+          <div className="p-6 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-2">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/15 text-[#4cc38a] flex items-center justify-center mx-auto">
+              <Award className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
+            </div>
+            <h3 className="text-base font-medium text-[#eef0f5]">Blueprint complete</h3>
+            <p className="text-xs sm:text-sm text-[#a3a9b8]">
+              All {milestones.length} milestones in{' '}
+              <strong className="text-[#eef0f5] font-medium">{roadmap.title}</strong> are verified.
             </p>
-          </motion.div>
+          </div>
         )}
       </div>
 
-      {/* Target Key Outcomes Modal */}
+      {/* Outcomes Modal */}
       <Modal
         isOpen={showOutcomesModal}
         onClose={() => setShowOutcomesModal(false)}
-        title="Expected Learning Outcomes"
+        title="Expected learning outcomes"
       >
         <div className="space-y-3">
-          <p className="text-xs text-slate-300 leading-relaxed">
-            By completing this blueprint, you will master and independently verify the following capabilities:
+          <p className="text-xs text-[#a3a9b8] leading-relaxed">
+            Upon finishing this blueprint, you will have practiced and verified the following capabilities:
           </p>
           <div className="space-y-2">
             {(roadmap.key_outcomes || []).map((outcome, idx) => (
               <div
                 key={idx}
-                className="flex items-start gap-2.5 p-3 rounded-xl bg-[#0e141f] border border-[#1e293b] text-xs text-slate-200"
+                className="flex items-start gap-2.5 p-3 rounded-lg bg-[#0b0d14] border border-white/[0.08] text-xs text-[#eef0f5]"
               >
-                <Target className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" aria-hidden="true" />
+                <span className="font-mono text-[#7a8296] tnum shrink-0">
+                  {String(idx + 1).padStart(2, '0')}
+                </span>
                 <span>{outcome}</span>
               </div>
             ))}
           </div>
           <div className="flex justify-end pt-2">
             <button
+              type="button"
               onClick={() => setShowOutcomesModal(false)}
-              className="btn-primary text-xs py-2 px-4"
+              className="btn-primary text-xs h-9 px-4"
             >
               Done
             </button>
@@ -906,20 +899,21 @@ export default function RoadmapPage() {
       <Modal
         isOpen={showQuizModal}
         onClose={() => setShowQuizModal(false)}
-        title="Milestone Verification Quiz"
+        title="Milestone verification quiz"
       >
         {quizLoading ? (
           <div className="py-10 text-center space-y-3">
             <Spinner size="md" />
-            <p className="text-xs text-slate-400 font-mono">
-              Synthesizing verification scenario questions…
+            <p className="text-xs text-[#7a8296] font-mono">
+              Generating scenario questions…
             </p>
           </div>
         ) : (
           <form onSubmit={handleQuizSubmit} className="space-y-4">
-            <p className="text-xs text-slate-300">
-              Answer these short conceptual scenarios to certify mastery of{' '}
-              <strong>{pendingQuizMilestone?.title}</strong> and earn bonus XP!
+            <p className="text-xs text-[#a3a9b8]">
+              Answer these scenario questions to verify{' '}
+              <strong className="text-[#eef0f5] font-medium">{pendingQuizMilestone?.title}</strong>{' '}
+              and earn bonus XP.
             </p>
 
             {quizError && (
@@ -936,9 +930,9 @@ export default function RoadmapPage() {
               {quizQuestions.map((q, qIdx) => (
                 <div
                   key={qIdx}
-                  className="p-3.5 rounded-xl bg-[#0e141f] border border-[#1e293b] space-y-2 text-xs"
+                  className="p-3.5 rounded-lg bg-[#0b0d14] border border-white/[0.08] space-y-2 text-xs"
                 >
-                  <p className="font-semibold text-slate-200">
+                  <p className="font-medium text-[#eef0f5]">
                     {qIdx + 1}. {q.question}
                   </p>
                   <div className="space-y-1.5 pl-1">
@@ -946,7 +940,7 @@ export default function RoadmapPage() {
                       <label
                         key={oIdx}
                         htmlFor={`quiz-q-${qIdx}-opt-${oIdx}`}
-                        className="flex items-center gap-2 cursor-pointer hover:text-white"
+                        className="flex items-center gap-2 cursor-pointer hover:text-[#eef0f5]"
                       >
                         <input
                           id={`quiz-q-${qIdx}-opt-${oIdx}`}
@@ -954,9 +948,9 @@ export default function RoadmapPage() {
                           name={`quiz-q-${qIdx}`}
                           value={opt}
                           onChange={() => setQuizAnswers({ ...quizAnswers, [qIdx]: opt })}
-                          className="accent-blue-600 text-blue-600"
+                          className="accent-blue-500"
                         />
-                        <span className="text-slate-300 text-xs">{opt}</span>
+                        <span className="text-[#a3a9b8] text-xs">{opt}</span>
                       </label>
                     ))}
                   </div>
@@ -968,19 +962,19 @@ export default function RoadmapPage() {
               <button
                 type="button"
                 onClick={() => setShowQuizModal(false)}
-                className="btn-secondary text-xs py-2 px-4"
+                className="btn-secondary text-xs h-9 px-4"
               >
                 Cancel
               </button>
-              <button type="submit" className="btn-primary text-xs py-2 px-4">
-                Submit Answers &amp; Unlock
+              <button type="submit" className="btn-primary text-xs h-9 px-4">
+                Submit &amp; unlock
               </button>
             </div>
           </form>
         )}
       </Modal>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Dialog */}
       <DeleteConfirmModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
