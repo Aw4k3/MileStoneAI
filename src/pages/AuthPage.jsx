@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import Spinner from '../components/common/Spinner';
 import BrandMark from '../components/common/BrandMark';
+import VantaWavesBackground from '../components/common/VantaWavesBackground';
 
 export default function AuthPage() {
   const { theme, toggleTheme } = useTheme();
@@ -59,9 +60,11 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-[#0b0d14] text-[#eef0f5] relative">
+    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 text-[#eef0f5] relative">
+      <VantaWavesBackground />
+
       {/* Theme toggle */}
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 z-10">
         <button
           type="button"
           onClick={toggleTheme}
@@ -79,14 +82,14 @@ export default function AuthPage() {
       {/* Brand */}
       <Link
         to="/"
-        className="mb-8 focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg p-1"
+        className="relative z-10 mb-8 focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg p-1"
         aria-label="Milestone AI home"
       >
         <BrandMark />
       </Link>
 
       {/* Auth Panel (16px radius, 24px padding -> 8px nested control radius) */}
-      <div className="w-full max-w-sm bg-[#11141c] border border-white/[0.1] rounded-2xl p-6">
+      <div className="relative z-10 w-full max-w-sm bg-[#11141c] border border-white/[0.1] rounded-2xl p-6">
         <div
           className="grid grid-cols-2 seg-track mb-6 text-xs"
           role="tablist"

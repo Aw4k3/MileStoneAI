@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import BrandMark from '../components/common/BrandMark';
 import ProgressRing from '../components/common/ProgressRing';
+import VantaWavesBackground from '../components/common/VantaWavesBackground';
 
 const PLATFORM_FEATURES = [
   {
@@ -155,7 +156,9 @@ export default function LandingPage() {
   const demoProgress = Math.round(((8 + completedDemoDeliverables) / 14) * 100);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0b0d14] text-[#eef0f5]">
+    <div className="min-h-screen flex flex-col relative text-[#eef0f5]">
+      <VantaWavesBackground />
+
       {/* Sticky Top Navigation */}
       <header
         className={`sticky top-0 z-40 w-full backdrop-blur-md border-b transition-[background-color,border-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
@@ -212,7 +215,7 @@ export default function LandingPage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-6">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-6 relative z-10">
         {/* Hero: Asymmetric split with interactive product workspace */}
         <section className="py-12 sm:py-16 lg:py-20 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
           <div className="lg:col-span-5 space-y-6">
@@ -521,7 +524,7 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="text-xs text-[#7a8296] py-6 border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between max-w-6xl w-full mx-auto px-6 gap-3">
+      <footer className="relative z-10 text-xs text-[#7a8296] py-6 border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between max-w-6xl w-full mx-auto px-6 gap-3">
         <p>© {new Date().getFullYear()} Milestone AI · Adaptive learning blueprints</p>
         <div className="flex items-center gap-5">
           <Link to="/docs" className="text-[#7a8296] hover:text-[#eef0f5] transition-colors">
