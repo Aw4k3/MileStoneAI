@@ -122,7 +122,7 @@ export default function ChatPage() {
 
             {/* Persona Switcher */}
             <div
-              className="flex items-center p-0.5 rounded-lg bg-[#11141c] border border-white/[0.08] text-xs"
+              className="flex items-center seg-track text-xs"
               role="radiogroup"
               aria-label="Mentor Persona"
             >
@@ -136,10 +136,8 @@ export default function ChatPage() {
                     role="radio"
                     aria-checked={active}
                     onClick={() => setPersona(p.value)}
-                    className={`h-7 px-2.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                      active
-                        ? 'bg-[#1a1e28] text-[#eef0f5]'
-                        : 'text-[#7a8296] hover:text-[#eef0f5]'
+                    className={`h-7 px-2.5 text-xs font-medium flex items-center gap-1.5 seg-tab ${
+                      active ? 'seg-tab-active' : ''
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />

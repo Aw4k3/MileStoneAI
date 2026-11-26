@@ -7,14 +7,14 @@ import React from 'react';
  */
 export default function BrandMark({ showWordmark = true, suffix = '' }) {
   return (
-    <span className="inline-flex items-center gap-2.5 select-none">
+    <span className="inline-flex items-center gap-1.5 min-[375px]:gap-2 sm:gap-2.5 select-none whitespace-nowrap shrink-0">
       <svg
-        width="24"
-        height="24"
+        width="22"
+        height="22"
         viewBox="0 0 24 24"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="shrink-0"
+        className="w-5 h-5 min-[375px]:w-[22px] min-[375px]:h-[22px] sm:w-6 sm:h-6 shrink-0"
         aria-hidden="true"
       >
         <rect
@@ -36,7 +36,7 @@ export default function BrandMark({ showWordmark = true, suffix = '' }) {
         <circle cx="12" cy="17.25" r="1.75" className="brand-mark-dot" />
       </svg>
       {showWordmark && (
-        <span className="font-medium tracking-[-0.015em] text-[15px] text-[#eef0f5] inline-flex items-baseline gap-1.5">
+        <span className="font-medium tracking-[-0.015em] text-[12.5px] min-[375px]:text-[13.5px] sm:text-[15px] text-[#eef0f5] inline-flex items-baseline gap-1.5 whitespace-nowrap">
           <span>Milestone AI</span>
           {suffix && (
             <span className="font-mono text-xs text-[#7a8296] font-normal">{suffix}</span>

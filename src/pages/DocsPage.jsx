@@ -619,7 +619,7 @@ export default function DocsPage() {
           </div>
 
           <div
-            className="flex items-center p-1 rounded-lg bg-[#07080d] border border-white/[0.08] text-xs font-mono"
+            className="flex items-center seg-track text-xs font-mono"
             role="tablist"
           >
             {[
@@ -637,8 +637,8 @@ export default function DocsPage() {
                   role="tab"
                   aria-selected={active}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 h-7 rounded-md font-medium transition-colors ${
-                    active ? 'bg-[#1a1e28] text-[#eef0f5]' : 'text-[#7a8296] hover:text-[#eef0f5]'
+                  className={`flex items-center gap-1.5 px-3 h-7 font-medium seg-tab ${
+                    active ? 'seg-tab-active' : ''
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />

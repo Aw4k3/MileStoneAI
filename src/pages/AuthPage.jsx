@@ -88,7 +88,7 @@ export default function AuthPage() {
       {/* Auth Panel (16px radius, 24px padding -> 8px nested control radius) */}
       <div className="w-full max-w-sm bg-[#11141c] border border-white/[0.1] rounded-2xl p-6">
         <div
-          className="grid grid-cols-2 p-1 rounded-lg bg-[#07080d] border border-white/[0.08] mb-6 text-xs"
+          className="grid grid-cols-2 seg-track mb-6 text-xs"
           role="tablist"
         >
           <button
@@ -99,9 +99,7 @@ export default function AuthPage() {
               setIsSignUp(false);
               setFormError('');
             }}
-            className={`h-8 font-medium rounded-md transition-colors ${
-              !isSignUp ? 'bg-[#1a1e28] text-[#eef0f5]' : 'text-[#7a8296] hover:text-[#eef0f5]'
-            }`}
+            className={`h-8 font-medium seg-tab ${!isSignUp ? 'seg-tab-active' : ''}`}
           >
             Sign in
           </button>
@@ -113,9 +111,7 @@ export default function AuthPage() {
               setIsSignUp(true);
               setFormError('');
             }}
-            className={`h-8 font-medium rounded-md transition-colors ${
-              isSignUp ? 'bg-[#1a1e28] text-[#eef0f5]' : 'text-[#7a8296] hover:text-[#eef0f5]'
-            }`}
+            className={`h-8 font-medium seg-tab ${isSignUp ? 'seg-tab-active' : ''}`}
           >
             Create account
           </button>

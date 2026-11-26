@@ -118,6 +118,26 @@ export default function LandingPage() {
   const [previewTab, setPreviewTab] = useState('timeline');
   const [checkedIds, setCheckedIds] = useState({ d1: true, d2: false, d3: false });
   const [pacingIdx, setPacingIdx] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    let rafId = null;
+    const handleScroll = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        const nextScrolled = window.scrollY > 12;
+        setIsScrolled((prev) => (prev !== nextScrolled ? nextScrolled : prev));
+        rafId = null;
+      });
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   useEffect(() => {
     if (window.location.hash?.includes('access_token')) {
@@ -136,46 +156,60 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0b0d14] text-[#eef0f5]">
-      {/* Quiet Top Navigation */}
-      <nav
-        className="flex items-center justify-between px-6 h-16 max-w-6xl w-full mx-auto border-b border-white/[0.08]"
-        aria-label="Main Navigation"
+      {/* Sticky Top Navigation */}
+      <header
+        className={`sticky top-0 z-40 w-full backdrop-blur-md border-b transition-[background-color,border-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          isScrolled
+            ? 'nav-scrolled bg-[#0b0d14]/95 border-white/[0.14] shadow-[0_8px_24px_-4px_rgba(0,0,0,0.5)]'
+            : 'bg-[#0b0d14]/85 border-white/[0.08] shadow-none'
+        }`}
       >
-        <Link to="/" className="focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg">
-          <BrandMark />
-        </Link>
+        <nav
+          className="flex items-center justify-between px-3 min-[375px]:px-4 sm:px-6 h-14 sm:h-16 max-w-6xl w-full mx-auto gap-1.5 min-[375px]:gap-2 sm:gap-4"
+          aria-label="Main Navigation"
+        >
+          <Link
+            to="/"
+            className="focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg shrink-0"
+          >
+            <BrandMark />
+          </Link>
 
-        <div className="flex items-center gap-2 sm:gap-4 text-[13px]">
-          <Link
-            to="/docs"
-            className="font-medium text-[#a3a9b8] hover:text-[#eef0f5] px-2 py-1.5 transition-colors hidden sm:inline-block"
-          >
-            Docs
-          </Link>
-          <Link
-            to="/auth"
-            className="font-medium text-[#a3a9b8] hover:text-[#eef0f5] px-2 py-1.5 transition-colors"
-          >
-            Sign in
-          </Link>
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#7a8296] hover:text-[#eef0f5] hover:bg-[#1a1e28] border border-white/[0.08] transition-colors focus-visible:ring-2 focus-visible:ring-blue-500"
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-4 h-4 text-amber-400" strokeWidth={1.5} aria-hidden="true" />
-            ) : (
-              <Moon className="w-4 h-4 text-blue-500" strokeWidth={1.5} aria-hidden="true" />
-            )}
-          </button>
-          <Link to="/auth" className="btn-primary text-[13px] h-9 px-4">
-            Create blueprint
-            <ArrowRight className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
-          </Link>
-        </div>
-      </nav>
+          <div className="flex items-center gap-1 min-[375px]:gap-2 sm:gap-4 shrink-0">
+            <Link
+              to="/docs"
+              className="font-medium text-[13px] text-[#a3a9b8] hover:text-[#eef0f5] px-2 py-1.5 transition-colors hidden sm:inline-block whitespace-nowrap"
+            >
+              Docs
+            </Link>
+            <Link
+              to="/auth"
+              className="font-medium text-[11px] min-[375px]:text-xs sm:text-[13px] text-[#a3a9b8] hover:text-[#eef0f5] px-1 min-[375px]:px-1.5 sm:px-2 py-1.5 transition-colors whitespace-nowrap shrink-0"
+            >
+              Sign in
+            </Link>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-[#7a8296] hover:text-[#eef0f5] hover:bg-[#1a1e28] border border-white/[0.08] transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 shrink-0"
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" strokeWidth={1.5} aria-hidden="true" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" strokeWidth={1.5} aria-hidden="true" />
+              )}
+            </button>
+            <Link
+              to="/auth"
+              className="btn-primary text-[11px] min-[375px]:text-xs sm:text-[13px] h-7 min-[375px]:h-8 sm:h-9 px-2 min-[375px]:px-3 sm:px-4 whitespace-nowrap shrink-0"
+            >
+              <span>Create blueprint</span>
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 hidden sm:inline-block shrink-0" strokeWidth={1.5} aria-hidden="true" />
+            </Link>
+          </div>
+        </nav>
+      </header>
 
       {/* Main Content */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-6">
@@ -227,7 +261,7 @@ export default function LandingPage() {
 
                 {/* Mode Switcher */}
                 <div
-                  className="inline-flex p-0.5 rounded-lg bg-[#11141c] border border-white/[0.08] text-xs font-mono"
+                  className="inline-flex seg-track text-xs font-mono"
                   role="tablist"
                   aria-label="Blueprint workspace preview"
                 >
@@ -244,10 +278,8 @@ export default function LandingPage() {
                         role="tab"
                         aria-selected={active}
                         onClick={() => setPreviewTab(tab.id)}
-                        className={`px-2.5 py-1 rounded-md transition-colors ${
-                          active
-                            ? 'bg-[#1a1e28] text-[#eef0f5]'
-                            : 'text-[#7a8296] hover:text-[#eef0f5]'
+                        className={`px-2.5 py-1 font-medium seg-tab ${
+                          active ? 'seg-tab-active' : ''
                         }`}
                       >
                         {tab.label}
