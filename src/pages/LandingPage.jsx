@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import BrandMark from '../components/common/BrandMark';
 import ProgressRing from '../components/common/ProgressRing';
+import DotGridWaveBackground from '../components/common/DotGridWaveBackground';
 
 const PLATFORM_FEATURES = [
   {
@@ -156,17 +157,12 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen flex flex-col relative isolate bg-[#0b0d14] text-[#eef0f5]">
-      <div
-        data-aifx="dot-grid-wave"
-        data-aifx-bg="#000000"
-        data-aifx-bg-alpha="0"
-        data-aifx-colors={theme === 'light' ? '#2563eb,#64748b' : '#3b82f6,#475569'}
-        data-aifx-dot-size="0.28"
-        data-aifx-spacing="0.55"
-        className={`fixed inset-0 -z-10 pointer-events-none transition-opacity duration-300 ${
-          theme === 'light' ? 'opacity-35' : 'opacity-55'
-        }`}
-        aria-hidden="true"
+      <DotGridWaveBackground
+        spacing={0.23}
+        dotSize={0.18}
+        waveScale={0.42}
+        angle={45}
+        mouse={1}
       />
 
       {/* Sticky Top Navigation */}
