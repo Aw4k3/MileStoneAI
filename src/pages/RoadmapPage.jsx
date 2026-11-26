@@ -32,9 +32,12 @@ import ProgressRing from '../components/common/ProgressRing';
 import Modal from '../components/common/Modal';
 import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import Spinner from '../components/common/Spinner';
+import NotificationOptInBanner, { wasPushPromptDismissed } from '../components/common/NotificationOptInBanner';
+import { useAuth } from '../contexts/AuthContext';
 import { useRoadmapDetail } from '../hooks/useRoadmapDetail';
 import { useRoadmaps } from '../hooks/useRoadmaps';
 import { useStats } from '../hooks/useStats';
+import { dispatchMilestonePush } from '../lib/pushDispatch';
 import {
   generateMicroQuizWithAI,
   rebalanceRoadmapWithAI,
@@ -59,6 +62,7 @@ const RESOURCE_META = {
 export default function RoadmapPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { deleteRoadmap } = useRoadmaps();
   const {
     roadmap,
@@ -68,6 +72,7 @@ export default function RoadmapPage() {
     toggleMilestone,
   } = useRoadmapDetail(id);
   const { awardXp } = useStats();
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
 
   const [expandedIds, setExpandedIds] = useState({});
   const [showOutcomesModal, setShowOutcomesModal] = useState(false);
@@ -164,6 +169,42 @@ export default function RoadmapPage() {
     }
   };
 
+  const notifyMilestoneProgress = async (milestoneObj, xpEarned, completionMeta, isQuiz = false) => {
+    if (!user || !milestoneObj || !completionMeta?.nextCompleted) return;
+
+    const { completedCount: doneCount, totalCount, allCompleted } = completionMeta;
+
+    if (!wasPushPromptDismissed()) {
+      setShowPushPrompt(true);
+    }
+
+    dispatchMilestonePush({
+      userId: user.id,
+      eventKey: `milestone_completed:${milestoneObj.id}`,
+      eventType: 'milestone_completed',
+      title: isQuiz ? 'Major checkpoint verified' : 'Milestone completed',
+      body: `“${milestoneObj.title}” (+${xpEarned} XP · ${doneCount}/${totalCount} verified)`,
+      targetUrl: `/roadmap/${roadmap.id}`,
+      payload: {
+        roadmapId: roadmap.id,
+        milestoneId: milestoneObj.id,
+        xpEarned,
+      },
+    });
+
+    if (allCompleted) {
+      dispatchMilestonePush({
+        userId: user.id,
+        eventKey: `blueprint_completed:${roadmap.id}`,
+        eventType: 'blueprint_completed',
+        title: 'Blueprint 100% completed!',
+        body: `All ${totalCount} milestones in “${roadmap.title}” are now verified.`,
+        targetUrl: `/roadmap/${roadmap.id}`,
+        payload: { roadmapId: roadmap.id, totalMilestones: totalCount },
+      });
+    }
+  };
+
   const handleMilestoneToggle = async (milestone) => {
     if (!milestone.is_completed && milestone.is_major) {
       setPendingQuizMilestone(milestone);
@@ -187,14 +228,16 @@ export default function RoadmapPage() {
     }
 
     const willBeCompleted = !milestone.is_completed;
-    toggleMilestone(milestone.id, milestone.is_completed);
+    const completionMeta = await toggleMilestone(milestone.id, milestone.is_completed);
 
     if (willBeCompleted) {
-      awardXp(milestone.xp_reward || 100);
+      const xpEarned = milestone.xp_reward || 100;
+      await awardXp(xpEarned, { blueprintCompleted: completionMeta?.allCompleted });
+      await notifyMilestoneProgress(milestone, xpEarned, completionMeta, false);
     }
   };
 
-  const handleQuizSubmit = (e) => {
+  const handleQuizSubmit = async (e) => {
     e.preventDefault();
     if (Object.keys(quizAnswers).length < quizQuestions.length) {
       setQuizError(`Please answer all ${quizQuestions.length} verification questions.`);
@@ -202,8 +245,13 @@ export default function RoadmapPage() {
     }
 
     if (pendingQuizMilestone) {
-      toggleMilestone(pendingQuizMilestone.id, false);
-      awardXp((pendingQuizMilestone.xp_reward || 200) + 100);
+      const xpEarned = (pendingQuizMilestone.xp_reward || 200) + 100;
+      const completionMeta = await toggleMilestone(pendingQuizMilestone.id, false);
+      await awardXp(xpEarned, {
+        quizPassed: true,
+        blueprintCompleted: completionMeta?.allCompleted,
+      });
+      await notifyMilestoneProgress(pendingQuizMilestone, xpEarned, completionMeta, true);
     }
 
     setShowQuizModal(false);
@@ -493,6 +541,12 @@ export default function RoadmapPage() {
             </Link>
           </div>
         </div>
+
+        {/* Contextual Notification Opt-In After First Milestone Verification */}
+        <NotificationOptInBanner
+          visible={showPushPrompt}
+          onDismiss={() => setShowPushPrompt(false)}
+        />
 
         {/* Milestone Route Timeline */}
         <div className="space-y-4">

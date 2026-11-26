@@ -314,6 +314,7 @@ html.light header.nav-scrolled {
 }
 
 html.light .bg-\[\#11141c\],
+html.light .bg-\[\#11141c\]\/95,
 html.light .bg-\[\#121824\],
 html.light .bg-slate-900,
 html.light .bg-slate-900\/80,
@@ -484,6 +485,9 @@ html.light .text-emerald-300 {
 }
 html.light .text-amber-400 {
   color: #d97706 !important;
+}
+html.light .text-amber-200 {
+  color: #92400e !important;
 }
 html.light .text-rose-400,
 html.light .text-\[\#e5484d\] {

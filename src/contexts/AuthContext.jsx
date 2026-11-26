@@ -29,6 +29,12 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isRecoverySession, setIsRecoverySession] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
+    return hash.includes('type=recovery') || search.includes('type=recovery');
+  });
 
   // Sync profile & email to public.profiles table
   const syncProfile = async (authUser) => {
@@ -172,7 +178,12 @@ export function AuthProvider({ children }) {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
 
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoverySession(true);
+      }
+
       if (event === 'SIGNED_OUT' || !newSession?.user) {
+        setIsRecoverySession(false);
         setUser(null);
         setSession(null);
         setLoading(false);
@@ -243,20 +254,25 @@ export function AuthProvider({ children }) {
   const signup = useCallback(async (email, password, displayName) => {
     setLoading(true);
     try {
+      const cleanName = (displayName || '').trim();
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth?verified=1`,
           data: {
-            full_name: displayName,
+            full_name: cleanName,
           },
         },
       });
 
       if (error) throw error;
 
-      if (data?.user) {
-        const resolvedName = displayName || data.user.email?.split('@')[0] || 'Adventurer';
+      // Only hydrate active user state if Supabase returned an immediate session
+      // (i.e. email confirmation disabled or already confirmed).
+      if (data?.user && data?.session) {
+        const resolvedName = cleanName || data.user.email?.split('@')[0] || 'Adventurer';
+        setSession(data.session);
         setUser({
           id: data.user.id,
           email: data.user.email,
@@ -267,10 +283,59 @@ export function AuthProvider({ children }) {
         await syncProfile(data.user);
       }
 
-      return data.user;
+      return {
+        user: data?.user ?? null,
+        session: data?.session ?? null,
+        requiresVerification: Boolean(data?.user && !data?.session),
+      };
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Resend Email Verification Link
+  const resendVerificationEmail = useCallback(async (email) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth?verified=1`,
+      },
+    });
+
+    if (error) throw error;
+  }, []);
+
+  // Request Password Reset Email
+  const requestPasswordReset = useCallback(async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    if (error) throw error;
+  }, []);
+
+  // Update Password During Recovery (or Authenticated Session)
+  const updatePassword = useCallback(async (newPassword) => {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) throw error;
+
+    // Revoke other active sessions after credential rotation
+    try {
+      await supabase.auth.signOut({ scope: 'others' });
+    } catch {
+      // non-fatal on single-session contexts
+    }
+
+    setIsRecoverySession(false);
+    return data?.user ?? null;
+  }, []);
+
+  const clearRecoverySession = useCallback(() => {
+    setIsRecoverySession(false);
   }, []);
 
   // Google OAuth Login
@@ -297,8 +362,25 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const currentUserId = user?.id;
+      if (currentUserId && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        try {
+          const reg = await navigator.serviceWorker.getRegistration('/');
+          const sub = await reg?.pushManager?.getSubscription();
+          if (sub) {
+            await supabase
+              .from('push_subscriptions')
+              .delete()
+              .eq('user_id', currentUserId)
+              .eq('endpoint', sub.endpoint);
+            await sub.unsubscribe();
+          }
+        } catch {
+          // non-fatal push cleanup on sign-out
+        }
+      }
       await supabase.auth.signOut();
       clearUserStorage(currentUserId);
+      setIsRecoverySession(false);
       setUser(null);
       setSession(null);
     } finally {
@@ -306,30 +388,21 @@ export function AuthProvider({ children }) {
     }
   }, [user]);
 
-  // Full local storage wipe & logout
-  const wipeAllLocalData = useCallback(async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      // non-fatal
-    }
-    localStorage.clear();
-    setUser(null);
-    setSession(null);
-    window.location.href = '/auth';
-  }, []);
-
   const value = {
     user,
     session,
     loading,
+    isRecoverySession,
     isSupabaseConnected: isSupabaseConfigured,
     isAuthenticated: Boolean(user),
     login,
     signup,
+    resendVerificationEmail,
+    requestPasswordReset,
+    updatePassword,
+    clearRecoverySession,
     loginWithGoogle,
     logout,
-    wipeAllLocalData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

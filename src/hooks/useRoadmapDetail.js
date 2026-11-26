@@ -60,6 +60,20 @@ function updateStoredMilestones(userId, roadmapId, milestonesList) {
   }
 }
 
+function updateStoredRoadmapStatus(userId, roadmapId, status) {
+  try {
+    const key = getRoadmapsStorageKey(userId);
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) return;
+    const updated = list.map((r) => (r.id === roadmapId ? { ...r, status } : r));
+    localStorage.setItem(key, JSON.stringify(updated));
+  } catch (err) {
+    console.warn('LocalStorage roadmap status update error:', err);
+  }
+}
+
 function sortAndNormalizeMilestones(list) {
   return [...(list || [])]
     .sort((a, b) => {
@@ -184,20 +198,30 @@ export function useRoadmapDetail(roadmapId) {
   const toggleMilestone = async (milestoneId, currentStatus) => {
     const nextStatus = !currentStatus;
     const userId = user?.id || null;
+    const nowIso = new Date().toISOString();
 
-    setMilestones((prev) => {
-      const updated = prev.map((m) =>
-        m.id === milestoneId
-          ? {
-              ...m,
-              is_completed: nextStatus,
-              completed_at: nextStatus ? new Date().toISOString() : null,
-            }
-          : m
-      );
-      updateStoredMilestones(userId, roadmapId, updated);
-      return updated;
-    });
+    const nextMilestones = milestones.map((m) =>
+      m.id === milestoneId
+        ? {
+            ...m,
+            is_completed: nextStatus,
+            completed_at: nextStatus ? nowIso : null,
+          }
+        : m
+    );
+
+    const completedCount = nextMilestones.filter((m) => m.is_completed).length;
+    const totalCount = nextMilestones.length;
+    const allCompleted = totalCount > 0 && completedCount === totalCount;
+    const nextRoadmapStatus = allCompleted ? 'completed' : 'active';
+
+    setMilestones(nextMilestones);
+    updateStoredMilestones(userId, roadmapId, nextMilestones);
+
+    if (roadmap && roadmap.status !== nextRoadmapStatus) {
+      setRoadmap((prev) => (prev ? { ...prev, status: nextRoadmapStatus } : prev));
+      updateStoredRoadmapStatus(userId, roadmapId, nextRoadmapStatus);
+    }
 
     if (isSupabaseConfigured && user) {
       try {
@@ -205,13 +229,28 @@ export function useRoadmapDetail(roadmapId) {
           .from('milestones')
           .update({
             is_completed: nextStatus,
-            completed_at: nextStatus ? new Date().toISOString() : null,
+            completed_at: nextStatus ? nowIso : null,
           })
           .eq('id', milestoneId);
+
+        if (roadmap && roadmap.status !== nextRoadmapStatus) {
+          await supabase
+            .from('roadmaps')
+            .update({ status: nextRoadmapStatus })
+            .eq('id', roadmapId)
+            .eq('user_id', user.id);
+        }
       } catch (err) {
         console.error('Failed to toggle milestone in Supabase:', err);
       }
     }
+
+    return {
+      nextCompleted: nextStatus,
+      allCompleted,
+      completedCount,
+      totalCount,
+    };
   };
 
   const addMilestone = async (newMilestoneData) => {

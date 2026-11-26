@@ -1,0 +1,17 @@
+MILESTONE AI — EMAIL VERIFICATION
+====================================
+
+Confirm your email address
+
+Welcome to Milestone AI. Verify {{ .Email }} to activate your account and sync your adaptive learning blueprints across devices.
+
+Verify your email by opening the link below:
+{{ .ConfirmationURL }}
+
+This verification link expires in 1 hour and can only be used once.
+
+If you did not create a Milestone AI account, you can safely ignore this message.
+
+---
+Milestone AI · Adaptive Learning Blueprints
+{{ .SiteURL }}

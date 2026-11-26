@@ -112,7 +112,7 @@ const PACING_PREVIEW = [
 ];
 
 export default function LandingPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, isRecoverySession } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -141,12 +141,21 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
-    if (window.location.hash?.includes('access_token')) {
-      navigate('/dashboard' + window.location.hash, { replace: true });
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
+    const isRecoveryLink =
+      hash.includes('type=recovery') || search.includes('type=recovery') || isRecoverySession;
+
+    if (isRecoveryLink) {
+      navigate('/reset-password' + search + hash, { replace: true });
+    } else if (hash.includes('error=') || search.includes('error=')) {
+      navigate('/auth' + search + hash, { replace: true });
+    } else if (hash.includes('access_token')) {
+      navigate('/dashboard' + hash, { replace: true });
     } else if (user && !loading) {
       navigate('/dashboard', { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, isRecoverySession, navigate]);
 
   const toggleSampleDeliverable = (id) => {
     setCheckedIds((prev) => ({ ...prev, [id]: !prev[id] }));

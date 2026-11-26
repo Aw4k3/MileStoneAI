@@ -15,16 +15,27 @@ import {
   GraduationCap,
   Target,
   Users,
+  Smartphone,
+  Send,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Modal from '../components/common/Modal';
 import Spinner from '../components/common/Spinner';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { usePWA } from '../contexts/PWAContext';
 import { useSettings } from '../hooks/useSettings';
 import { useRoadmaps } from '../hooks/useRoadmaps';
 import { useStats } from '../hooks/useStats';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 import { MENTOR_PERSONAS, PACING_OPTIONS } from '../lib/constants';
+
+const NOTIFICATION_EVENTS = [
+  { key: 'milestone_completed', label: 'Milestone verified' },
+  { key: 'blueprint_completed', label: 'Blueprint 100% completed' },
+  { key: 'streak_milestones', label: '7-day & 30-day streak milestones' },
+  { key: 'badges', label: 'Unlocked verified badges' },
+];
 
 const PERSONA_ICONS = {
   tutor: GraduationCap,
@@ -35,11 +46,24 @@ const PERSONA_ICONS = {
 export default function SettingsPage() {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { isStandalone, canUseNativePrompt, canInstallOnDemand, platform, promptInstall } = usePWA();
   const { settings, loading, updateSettings, deleteAllUserData } = useSettings();
   const { roadmaps } = useRoadmaps();
   const { stats } = useStats();
+  const {
+    isSupported: pushSupported,
+    requiresIosInstall,
+    permission: pushPermission,
+    isSubscribed,
+    busy: pushBusy,
+    statusError: pushError,
+    subscribe,
+    unsubscribe,
+    sendTestPush,
+  } = usePushNotifications();
 
   const [savedNotice, setSavedNotice] = useState(false);
+  const [testPushMessage, setTestPushMessage] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
   const [isWiping, setIsWiping] = useState(false);
@@ -61,8 +85,48 @@ export default function SettingsPage() {
   };
 
   const handleNotificationToggle = async () => {
-    await updateSettings({ push_enabled: !settings?.push_enabled });
+    setTestPushMessage('');
+    if (settings?.push_enabled && isSubscribed) {
+      await unsubscribe();
+      await updateSettings({ push_enabled: false });
+      triggerSaveNotification();
+      return;
+    }
+
+    if (settings?.push_enabled && !isSubscribed) {
+      const res = await subscribe();
+      if (!res.ok) {
+        await updateSettings({ push_enabled: false });
+        return;
+      }
+      await updateSettings({ push_enabled: true });
+      triggerSaveNotification();
+      return;
+    }
+
+    const res = await subscribe();
+    if (res.ok) {
+      await updateSettings({ push_enabled: true });
+      triggerSaveNotification();
+    }
+  };
+
+  const handlePreferenceToggle = async (prefKey) => {
+    const currentPrefs = settings?.notification_preferences || {};
+    const nextPrefs = {
+      ...currentPrefs,
+      [prefKey]: currentPrefs[prefKey] === false,
+    };
+    await updateSettings({ notification_preferences: nextPrefs });
     triggerSaveNotification();
+  };
+
+  const handleSendTestPush = async () => {
+    setTestPushMessage('');
+    const res = await sendTestPush();
+    if (res.ok) {
+      setTestPushMessage('Test push notification delivered to this device.');
+    }
   };
 
   const handlePacingChange = async (pacing) => {
@@ -286,57 +350,186 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* 3. Notifications */}
+        {/* 3. Notifications & App Installation */}
         <div className="p-5 sm:p-6 rounded-xl bg-[#11141c] border border-white/[0.08] space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Bell className="w-4 h-4 text-[#7a8296] shrink-0" strokeWidth={1.5} aria-hidden="true" />
-              <div>
-                <h2 className="text-sm font-medium text-[#eef0f5]">Milestone reminders</h2>
+          <div className="flex items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Bell className="w-4 h-4 text-[#7a8296] shrink-0 mt-0.5 sm:mt-0" strokeWidth={1.5} aria-hidden="true" />
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-sm font-medium text-[#eef0f5]">Milestone push notifications</h2>
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                      settings?.push_enabled && isSubscribed
+                        ? 'bg-emerald-500/10 border-emerald-500/25 text-[#4cc38a]'
+                        : pushPermission === 'denied'
+                        ? 'bg-rose-500/10 border-rose-500/25 text-rose-300'
+                        : 'bg-[#1a1e28] border-white/[0.08] text-[#7a8296]'
+                    }`}
+                  >
+                    {settings?.push_enabled && isSubscribed
+                      ? 'Device active'
+                      : requiresIosInstall
+                      ? 'Home Screen install required'
+                      : pushPermission === 'denied'
+                      ? 'Blocked in browser'
+                      : !pushSupported
+                      ? 'Browser unsupported'
+                      : 'Off on this device'}
+                  </span>
+                </div>
                 <p className="text-xs text-[#7a8296]">
-                  Browser notifications when scheduled milestone deliverables arrive
+                  Receive alerts when you verify milestones, unlock badges, hit streak targets, or complete blueprints.
                 </p>
               </div>
             </div>
             <button
               type="button"
+              disabled={pushBusy}
               onClick={handleNotificationToggle}
-              className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
-                settings?.push_enabled ? 'bg-blue-500' : 'bg-[#1a1e28] border border-white/[0.12]'
+              className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 disabled:opacity-50 ${
+                settings?.push_enabled && isSubscribed
+                  ? 'bg-blue-500'
+                  : 'bg-[#1a1e28] border border-white/[0.12]'
               }`}
               aria-label="Toggle push notifications"
             >
               <div
                 className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${
-                  settings?.push_enabled ? 'translate-x-5' : 'translate-x-0'
+                  settings?.push_enabled && isSubscribed ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </button>
           </div>
 
-          {settings?.push_enabled && (
-            <div className="pt-4 border-t border-white/[0.08] space-y-2.5">
-              <label className="text-xs font-mono text-[#7a8296] block">
-                Notification cadence
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {PACING_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => handlePacingChange(opt.value)}
-                    className={`h-9 px-3 rounded-lg border text-xs transition-colors ${
-                      settings?.notification_pacing === opt.value
-                        ? 'active-step-surface text-[#eef0f5] font-medium'
-                        : 'bg-[#0b0d14] border-white/[0.08] text-[#7a8296] hover:text-[#eef0f5]'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+          {pushError && (
+            <div
+              className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs leading-relaxed"
+              role="alert"
+            >
+              {pushError}
             </div>
           )}
+
+          {testPushMessage && (
+            <div
+              className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs"
+              role="status"
+            >
+              {testPushMessage}
+            </div>
+          )}
+
+          {settings?.push_enabled && (
+            <div className="pt-4 border-t border-white/[0.08] space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-mono text-[#7a8296] block">
+                  Milestone triggers
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {NOTIFICATION_EVENTS.map((ev) => {
+                    const enabled = settings?.notification_preferences?.[ev.key] !== false;
+                    return (
+                      <button
+                        key={ev.key}
+                        type="button"
+                        onClick={() => handlePreferenceToggle(ev.key)}
+                        className={`h-9 px-3 rounded-lg border text-xs flex items-center justify-between gap-2 transition-colors ${
+                          enabled
+                            ? 'active-step-surface text-[#eef0f5] font-medium'
+                            : 'bg-[#0b0d14] border-white/[0.08] text-[#7a8296]'
+                        }`}
+                      >
+                        <span className="truncate">{ev.label}</span>
+                        <span
+                          className={`w-3.5 h-3.5 rounded flex items-center justify-center border shrink-0 ${
+                            enabled
+                              ? 'bg-blue-500 border-blue-500 text-white'
+                              : 'border-white/[0.2] bg-transparent'
+                          }`}
+                        >
+                          {enabled && <Check className="w-2.5 h-2.5" strokeWidth={2.5} aria-hidden="true" />}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <label className="text-xs font-mono text-[#7a8296] block">
+                  Notification cadence
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {PACING_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => handlePacingChange(opt.value)}
+                      className={`h-9 px-3 rounded-lg border text-xs transition-colors ${
+                        settings?.notification_pacing === opt.value
+                          ? 'active-step-surface text-[#eef0f5] font-medium'
+                          : 'bg-[#0b0d14] border-white/[0.08] text-[#7a8296] hover:text-[#eef0f5]'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {isSubscribed && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    disabled={pushBusy}
+                    onClick={handleSendTestPush}
+                    className="btn-secondary text-xs h-8 px-3"
+                  >
+                    <Send className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+                    <span>{pushBusy ? 'Sending…' : 'Send test alert'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 3b. Install PWA App */}
+        <div className="p-5 sm:p-6 rounded-xl bg-[#11141c] border border-white/[0.08]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Smartphone className="w-4 h-4 text-[#7a8296] shrink-0" strokeWidth={1.5} aria-hidden="true" />
+              <div>
+                <h2 className="text-sm font-medium text-[#eef0f5]">Install home screen app</h2>
+                <p className="text-xs text-[#7a8296]">
+                  {isStandalone
+                    ? 'Running in installed standalone app mode on this device.'
+                    : platform.isIos
+                    ? 'Add Milestone AI to your iPhone or iPad Home Screen for standalone mode and push alerts.'
+                    : 'Install Milestone AI locally for standalone launch without browser toolbars.'}
+                </p>
+              </div>
+            </div>
+            {isStandalone ? (
+              <span className="text-xs font-mono text-[#4cc38a] px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/25 shrink-0 self-start sm:self-auto">
+                Installed
+              </span>
+            ) : canInstallOnDemand || canUseNativePrompt ? (
+              <button
+                type="button"
+                onClick={promptInstall}
+                className="btn-secondary text-xs h-9 px-3.5 shrink-0 self-start sm:self-auto"
+              >
+                <Download className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+                {canUseNativePrompt ? 'Install app' : 'How to install'}
+              </button>
+            ) : (
+              <span className="text-xs font-mono text-[#7a8296] shrink-0 self-start sm:self-auto">
+                Browser menu -&gt; Install
+              </span>
+            )}
+          </div>
         </div>
 
         {/* 4. Data Export */}

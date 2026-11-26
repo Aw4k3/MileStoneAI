@@ -14,6 +14,7 @@ import {
 import Layout from '../components/common/Layout';
 import Spinner from '../components/common/Spinner';
 import { useRoadmaps } from '../hooks/useRoadmaps';
+import { useStats } from '../hooks/useStats';
 import {
   generateRoadmapWithAI,
   estimateDurationWithAI,
@@ -45,6 +46,7 @@ export default function WizardPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { createRoadmap } = useRoadmaps();
+  const { recordBlueprintCreated } = useStats();
 
   const [step, setStep] = useState(0);
 
@@ -237,6 +239,7 @@ export default function WizardPage() {
         milestones: aiData?.milestones || [],
       });
 
+      await recordBlueprintCreated(finalTitle);
       setIsGenerating(false);
       navigate(`/roadmap/${created.id}`);
     } catch (err) {

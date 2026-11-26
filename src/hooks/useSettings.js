@@ -4,9 +4,22 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { MOCK_SETTINGS } from '../lib/mockData';
 
+const DEFAULT_NOTIFICATION_PREFS = {
+  milestone_completed: true,
+  blueprint_completed: true,
+  streak_milestones: true,
+  badges: true,
+};
+
+const FALLBACK_SETTINGS = {
+  ...MOCK_SETTINGS,
+  push_enabled: false,
+  notification_preferences: DEFAULT_NOTIFICATION_PREFS,
+};
+
 export function useSettings() {
   const { user } = useAuth();
-  const [settings, setSettings] = useState(MOCK_SETTINGS);
+  const [settings, setSettings] = useState(FALLBACK_SETTINGS);
   const [loading, setLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
@@ -16,7 +29,7 @@ export function useSettings() {
     }
 
     if (!isSupabaseConfigured) {
-      setSettings(MOCK_SETTINGS);
+      setSettings(FALLBACK_SETTINGS);
       setLoading(false);
       return;
     }
@@ -31,11 +44,17 @@ export function useSettings() {
       if (error && error.code !== 'PGRST116') throw error;
 
       if (data) {
-        setSettings(data);
+        setSettings({
+          ...data,
+          notification_preferences: {
+            ...DEFAULT_NOTIFICATION_PREFS,
+            ...data.notification_preferences,
+          },
+        });
       }
     } catch (err) {
       console.warn('Error fetching settings:', err.message);
-      setSettings(MOCK_SETTINGS);
+      setSettings(FALLBACK_SETTINGS);
     } finally {
       setLoading(false);
     }
