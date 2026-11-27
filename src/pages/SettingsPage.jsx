@@ -16,7 +16,6 @@ import {
   Target,
   Users,
   Smartphone,
-  Send,
 } from 'lucide-react';
 import Layout from '../components/common/Layout';
 import Modal from '../components/common/Modal';
@@ -59,11 +58,9 @@ export default function SettingsPage() {
     statusError: pushError,
     subscribe,
     unsubscribe,
-    sendTestPush,
   } = usePushNotifications();
 
   const [savedNotice, setSavedNotice] = useState(false);
-  const [testPushMessage, setTestPushMessage] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
   const [isWiping, setIsWiping] = useState(false);
@@ -85,7 +82,6 @@ export default function SettingsPage() {
   };
 
   const handleNotificationToggle = async () => {
-    setTestPushMessage('');
     if (settings?.push_enabled && isSubscribed) {
       await unsubscribe();
       await updateSettings({ push_enabled: false });
@@ -119,14 +115,6 @@ export default function SettingsPage() {
     };
     await updateSettings({ notification_preferences: nextPrefs });
     triggerSaveNotification();
-  };
-
-  const handleSendTestPush = async () => {
-    setTestPushMessage('');
-    const res = await sendTestPush();
-    if (res.ok) {
-      setTestPushMessage('Test push notification delivered to this device.');
-    }
   };
 
   const handlePacingChange = async (pacing) => {
@@ -411,15 +399,6 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {testPushMessage && (
-            <div
-              className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs"
-              role="status"
-            >
-              {testPushMessage}
-            </div>
-          )}
-
           {settings?.push_enabled && (
             <div className="pt-4 border-t border-white/[0.08] space-y-4">
               <div className="space-y-2">
@@ -477,20 +456,6 @@ export default function SettingsPage() {
                   ))}
                 </div>
               </div>
-
-              {isSubscribed && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    disabled={pushBusy}
-                    onClick={handleSendTestPush}
-                    className="btn-secondary text-xs h-8 px-3"
-                  >
-                    <Send className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
-                    <span>{pushBusy ? 'Sending…' : 'Send test alert'}</span>
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>

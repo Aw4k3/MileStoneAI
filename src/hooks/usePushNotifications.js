@@ -200,46 +200,6 @@ export function usePushNotifications() {
     }
   }, [hasPushApi, user]);
 
-  const sendTestPush = useCallback(async () => {
-    setStatusError('');
-    if (!user || !isSupabaseConfigured) {
-      return { ok: false, error: 'Sign in required.' };
-    }
-
-    setBusy(true);
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-      if (!accessToken) {
-        throw new Error('Active session required to send a test alert.');
-      }
-
-      const { data, error } = await supabase.functions.invoke('send-push-notification', {
-        body: {
-          action: 'test',
-          title: 'Milestone AI alerts are active',
-          body: 'Push notifications are configured for milestone completions, streaks, and badges.',
-          targetUrl: '/dashboard',
-        },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      if (error) throw error;
-      if (data?.delivered === 0) {
-        throw new Error('No registered device subscription found yet for this browser.');
-      }
-      return { ok: true, data };
-    } catch (err) {
-      const msg = err?.message || 'Could not deliver test notification.';
-      setStatusError(msg);
-      return { ok: false, error: msg };
-    } finally {
-      setBusy(false);
-    }
-  }, [user]);
-
   return {
     isSupported,
     requiresIosInstall,
@@ -249,7 +209,6 @@ export function usePushNotifications() {
     statusError,
     subscribe,
     unsubscribe,
-    sendTestPush,
     refreshStatus,
   };
 }
