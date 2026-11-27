@@ -286,18 +286,17 @@
       //   "sender_name": "Admin"
       // },
 
-      // Custom email templates (requires custom SMTP or paid plan on Supabase to push via CLI;
-      // templates live in ./supabase/templates/{confirmation,recovery}.{html,txt})
-      // "template": {
-      //   "confirmation": {
-      //     "subject": "Verify your Milestone AI email address",
-      //     "content_path": "./supabase/templates/confirmation.html"
-      //   },
-      //   "recovery": {
-      //     "subject": "Reset your Milestone AI password",
-      //     "content_path": "./supabase/templates/recovery.html"
-      //   }
-      // },
+      // Custom email templates pushed to Supabase Auth (templates in ./supabase/templates/)
+      "template": {
+        "confirmation": {
+          "subject": "Verify your Milestone AI email address",
+          "content_path": "./supabase/templates/confirmation.html"
+        },
+        "recovery": {
+          "subject": "Reset your Milestone AI password",
+          "content_path": "./supabase/templates/recovery.html"
+        }
+      },
 
       // Uncomment to customize notification email template
       // "notification": {
